@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>undercurrent — board</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 24px; color: #222; }
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .col h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: #666; }
+  .card { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #fff; }
+  .card small { color: #888; }
+  .muted { color: #888; }
+</style>
+<h1>undercurrent</h1>
+<p class="muted">The internal board. Reads <code>GET /tasks</code>; drag and drop, detail, calls and the time slider are not built yet.</p>
+<div class="board" id="board"></div>
+<script>
+  const stages = ["unstaged", "staged", "committed", "closed"];
+  fetch("/tasks").then(r => r.json()).then(tasks => {
+    const board = document.getElementById("board");
+    for (const stage of stages) {
+      const col = document.createElement("div"); col.className = "col";
+      const rows = tasks.filter(t => t.stage === stage);
+      col.innerHTML = `<h2>${stage} · ${rows.length}</h2>` + rows.map(t =>
+        `<div class="card">${t.text}<br><small>${t.id}${t.tags.length ? " · " + t.tags.map(x => "+" + x).join(" ") : ""}${t.context ? "<br>" + t.context : ""}</small></div>`).join("");
+      board.appendChild(col);
+    }
+  });
+</script>

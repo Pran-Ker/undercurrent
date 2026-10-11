@@ -1,0 +1,6 @@
+{
+  "_comment": "Phase 2. The live agent's configuration, applied by scripts/elevenlabs-agent.sh through the create/update agent API. Webhook tools point at ${PUBLIC_URL}/live/tools/<name> with the LIVE_TOOL_SECRET header; key tools answer with a read-back until called again with confirmed=true.",
+  "name": "undercurrent",
+  "first_message": "What's on your mind?",
+  "tools": ["list_board", "add_task", "stage_task", "commit_task", "retransform", "edit_task", "close_task", "answer_agent", "recall"]
+}

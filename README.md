@@ -1,21 +1,49 @@
 # undercurrent
 
-A personal agent you reach by text or by phone call. It keeps your tasks and acts on them: writes
-down what you say, picks a few things up on purpose, and calls or messages you when something is
-due.
+A voice-first personal agent for the things you have to do. You write tasks down; you stage the
+ones you mean by adding context; you commit a staged task to an agent, or retransform it in a
+conversation, or close it yourself. A live voice agent can do all of that on your word, reading
+back anything that matters before it happens. Every move is an event, so the board can be shown as
+it was at any moment and read as who-did-what.
+
+## Layout
+
+```
+backend/            Go. The board, the API, the runs, the live agent's tools, the event log.
+  cmd/undercurrent  the binary: serve · migrate · seed
+  internal/store    the database (a local file, or Turso) and the migrations
+  internal/api      the HTTP surface — see API.md
+  internal-web-ui/  the internal board, a static page served by the backend
+  elevenlabs/       the live agent's configuration (phase 2)
+  db/               schema.sql, migrations/, demo.sql (42 demo tasks)
+  API.md            the contract the app and the UI are written against
+mobile-app/         Expo. See MOBILE_APP.md for what it is; README.md for how to start.
+MOBILE_APP.md       the app, screen by screen
+TESTING.md          the integration tests, one diagram each
+SUGGESTIONS.md      what the references teach, and what to borrow
+```
+
+## Run
+
+```sh
+cp .env.example .env            # a local file database by default
+cd backend
+go run ./cmd/undercurrent seed  # migrate + the demo set
+go run ./cmd/undercurrent serve # http://127.0.0.1:8787 — the board at /, the API at /tasks
+go test ./...
+```
+
+Point `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` at the shared database instead to work on the
+same board.
+
+## Lifecycle
+
+`unstaged` (written down) → `staged` (context added) → `committed` (an agent is on it) → `closed`.
+A staged task can be retransformed — rewritten, enriched, split, or completed with the next step
+yielded. Closing and editing never need an agent. There is no erase.
 
 ## Status
 
-Day zero. What exists:
-
-- `schema.sql` — the task table: two layers, a garage for anything written down and a tray for the
-  few things picked on purpose. Permanent four-character ids, dates as days, tags as words.
-- `demo.sql` — a demo set of 42 tasks covering every shape the table allows: recurring templates
-  with a period in words or a cron expression, the children they produce, lines waiting for their
-  day, tasks captured from a call, a text, an email or a calendar event, an overdue one, a
-  handed-back one, finished ones, and a someday pile. The demo's today is 2026-09-01.
-- A Turso database named `undercurrent` holding that table and that demo set. Its URL and token
-  live in `.env` (gitignored), as `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. An empty database
-  is rebuilt with `turso db shell <db> < schema.sql && turso db shell <db> < demo.sql`.
-
-Everything else — the agent, the call surface, the text surface — is still to be designed.
+Day one. Built: the store, the migration, the demo set, `GET /tasks`, add, stage, edit, close,
+events, a read-only board page. Not built: runs (commit, retransform), time travel, the live agent,
+the mobile app. `backend/API.md` says which is which.

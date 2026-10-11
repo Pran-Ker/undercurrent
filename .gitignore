@@ -1,4 +1,8 @@
 .env
-.venv/
-__pycache__/
+*.db
+*.db-journal
+*.db-wal
 node_modules/
+.expo/
+backend/bin/
+__pycache__/
