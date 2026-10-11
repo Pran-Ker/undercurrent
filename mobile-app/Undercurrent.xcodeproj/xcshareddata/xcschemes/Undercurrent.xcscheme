@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1600"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      runPostActionsOnFailure = "NO">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A5B23A4ADF3220BC4DB0E732"
+               BuildableName = "Undercurrent.app"
+               BlueprintName = "Undercurrent"
+               ReferencedContainer = "container:Undercurrent.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5778BEE4B0399AD39D6E956C"
+               BuildableName = "UndercurrentTests.xctest"
+               BlueprintName = "UndercurrentTests"
+               ReferencedContainer = "container:Undercurrent.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8349C9F528F6AB23184A7052"
+               BuildableName = "UndercurrentUITests.xctest"
+               BlueprintName = "UndercurrentUITests"
+               ReferencedContainer = "container:Undercurrent.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      onlyGenerateCoverageForSpecifiedTargets = "NO">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "A5B23A4ADF3220BC4DB0E732"
+            BuildableName = "Undercurrent.app"
+            BlueprintName = "Undercurrent"
+            ReferencedContainer = "container:Undercurrent.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5778BEE4B0399AD39D6E956C"
+               BuildableName = "UndercurrentTests.xctest"
+               BlueprintName = "UndercurrentTests"
+               ReferencedContainer = "container:Undercurrent.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8349C9F528F6AB23184A7052"
+               BuildableName = "UndercurrentUITests.xctest"
+               BlueprintName = "UndercurrentUITests"
+               ReferencedContainer = "container:Undercurrent.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+      <CommandLineArguments>
+      </CommandLineArguments>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "A5B23A4ADF3220BC4DB0E732"
+            BuildableName = "Undercurrent.app"
+            BlueprintName = "Undercurrent"
+            ReferencedContainer = "container:Undercurrent.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <CommandLineArguments>
+      </CommandLineArguments>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "A5B23A4ADF3220BC4DB0E732"
+            BuildableName = "Undercurrent.app"
+            BlueprintName = "Undercurrent"
+            ReferencedContainer = "container:Undercurrent.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>

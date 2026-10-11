@@ -23,3 +23,4 @@ mobile-app/screenshots/*.png
 *.p12
 *.mobileprovision
 .DS_Store
+mobile-app/scripts/.env.local
