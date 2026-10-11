@@ -12,6 +12,7 @@ FROM node:22-slim
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.1.0 && npm cache clean --force
 WORKDIR /app
 COPY --from=build /undercurrent /usr/local/bin/undercurrent
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY backend/internal-web-ui ./internal-web-ui
 COPY backend/elevenlabs ./elevenlabs
 ENV AGENT_CMD="pi -p --model openrouter/google/gemini-3.5-flash-lite --no-session -nc --thinking low" \
