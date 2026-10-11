@@ -7,3 +7,19 @@ node_modules/
 backend/bin/
 __pycache__/
 .claude/settings.local.json
+
+# mobile-app (Xcode, generated project, fastlane output)
+mobile-app/*.xcodeproj/xcuserdata/
+mobile-app/build/
+mobile-app/DerivedData/
+mobile-app/*.ipa
+mobile-app/*.dSYM.zip
+mobile-app/fastlane/report.xml
+mobile-app/fastlane/Preview.html
+mobile-app/fastlane/test_output/
+mobile-app/.bundle/
+mobile-app/vendor/
+mobile-app/screenshots/*.png
+*.p12
+*.mobileprovision
+.DS_Store

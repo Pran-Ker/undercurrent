@@ -17,7 +17,7 @@ backend/            Go. The board, the API, the runs, the live agent's tools, th
   elevenlabs/       the live agent's configuration (phase 2)
   db/               schema.sql, migrations/, demo.sql (42 demo tasks)
   API.md            the contract the app and the UI are written against
-mobile-app/         Expo. See MOBILE_APP.md for what it is; README.md for how to start.
+mobile-app/         SwiftUI (iOS 17), XcodeGen + Fastlane. See MOBILE_APP.md for what it is; its README for how to run and ship.
 MOBILE_APP.md       the app, screen by screen
 TESTING.md          the integration tests, one diagram each
 SUGGESTIONS.md      what the references teach, and what to borrow
@@ -34,7 +34,9 @@ go test ./...
 ```
 
 Point `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` at the shared database instead to work on the
-same board.
+same board. `backend/scripts/serve.sh` does that from `.env` (never `seed` against it);
+`backend/scripts/serve-local.sh` runs a throwaway file database with the demo set on :8788;
+`backend/scripts/install-launchd.sh` keeps the shared-board backend running on this Mac for the app.
 
 ## Lifecycle
 
@@ -61,7 +63,7 @@ Keewano forwarder (off without a key), calls out through Dial for committed task
 number, the internal board page, and the ElevenLabs agent sync from `elevenlabs/agent.json`. Twelve
 integration tests, one diagram each, in `TESTING.md`.
 
-Not built: the mobile app (spec in `MOBILE_APP.md`), Darwin, Alike as a memory source.
+The mobile app is built (`mobile-app/`, SwiftUI; the call screen runs on the ElevenLabs Swift SDK). Not built: Darwin, Alike as a memory source.
 
 ## Integrations fail on their own
 

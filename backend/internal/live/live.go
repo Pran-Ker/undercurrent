@@ -31,8 +31,12 @@ type Live struct {
 }
 
 func New(s *store.Store, r *runs.Runner, recall func(string) string) *Live {
+	agent := os.Getenv("ELEVENLABS_AGENT_ID")
+	if agent == "" {
+		agent = s.Meta("elevenlabs_agent_id") // what `elevenlabs sync` minted
+	}
 	return &Live{S: s, Runner: r, Secret: os.Getenv("LIVE_TOOL_SECRET"), APIKey: os.Getenv("ELEVENLABS_API_KEY"),
-		AgentID: os.Getenv("ELEVENLABS_AGENT_ID"), WebhookSecret: os.Getenv("ELEVENLABS_WEBHOOK_SECRET"), Recall: recall}
+		AgentID: agent, WebhookSecret: os.Getenv("ELEVENLABS_WEBHOOK_SECRET"), Recall: recall}
 }
 
 // Tools is the catalogue: name, class, what it does. The agent's configuration is generated
@@ -309,28 +313,41 @@ func (l *Live) boardText(stage string) (string, error) {
 }
 
 // SignedURL handles GET /live/signed-url: the app and the page start a private conversation.
+// The signed URL is the WebSocket (text, the page); the token is the WebRTC room the Swift SDK
+// joins for voice. Either is empty when its upstream call failed; both failing is a 502.
 func (l *Live) SignedURL(w http.ResponseWriter, r *http.Request) {
 	if l.APIKey == "" || l.AgentID == "" {
 		reply(w, 503, map[string]string{"error": "ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID are not set"})
 		return
 	}
-	req, _ := http.NewRequest("GET", "https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id="+l.AgentID, nil)
+	signed, err1 := l.elevenlabs("/v1/convai/conversation/get-signed-url", "signed_url")
+	token, err2 := l.elevenlabs("/v1/convai/conversation/token", "token")
+	if err1 != nil && err2 != nil {
+		reply(w, 502, map[string]string{"error": "elevenlabs: " + err1.Error() + "; " + err2.Error()})
+		return
+	}
+	reply(w, 200, map[string]string{"signed_url": signed, "token": token, "agent_id": l.AgentID})
+}
+
+// elevenlabs makes one GET for this agent and returns the named string field of the reply.
+func (l *Live) elevenlabs(path, field string) (string, error) {
+	req, _ := http.NewRequest("GET", "https://api.elevenlabs.io"+path+"?agent_id="+l.AgentID, nil)
 	req.Header.Set("xi-api-key", l.APIKey)
 	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
 	if err != nil {
-		reply(w, 502, map[string]string{"error": err.Error()})
-		return
+		return "", err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
-	var out struct {
-		SignedURL string `json:"signed_url"`
+	var out map[string]any
+	if json.Unmarshal(raw, &out) != nil {
+		return "", fmt.Errorf("%s: %s", path, strings.TrimSpace(string(raw)))
 	}
-	if json.Unmarshal(raw, &out) != nil || out.SignedURL == "" {
-		reply(w, 502, map[string]string{"error": "elevenlabs: " + string(raw)})
-		return
+	v, _ := out[field].(string)
+	if v == "" {
+		return "", fmt.Errorf("%s: %s", path, strings.TrimSpace(string(raw)))
 	}
-	reply(w, 200, map[string]string{"signed_url": out.SignedURL, "agent_id": l.AgentID})
+	return v, nil
 }
 
 // PostCall handles the post-call webhook: verified, the transcript becomes a live session.

@@ -82,11 +82,15 @@ func (c *client) tool(t Tool) (string, error) {
 	}}
 	key := "elevenlabs_tool_" + t.Name
 	if id := c.s.Meta(key); id != "" {
-		if _, err := c.do("PATCH", "/convai/tools/"+id, body); err != nil {
+		_, err := c.do("PATCH", "/convai/tools/"+id, body)
+		if err == nil {
+			c.log("  ✓ tool %s updated (%s)", t.Name, id)
+			return id, nil
+		}
+		if !gone(err) {
 			return "", fmt.Errorf("could not update %s: %w", id, err)
 		}
-		c.log("  ✓ tool %s updated (%s)", t.Name, id)
-		return id, nil
+		c.log("  · tool %s (%s) is gone from this account; creating it again", t.Name, id)
 	}
 	out, err := c.do("POST", "/convai/tools", body)
 	if err != nil {
@@ -117,11 +121,15 @@ func (c *client) agent(spec Spec, toolIDs []string) (string, error) {
 	body := map[string]any{"name": spec.Name, "conversation_config": conv,
 		"platform_settings": map[string]any{"auth": map[string]any{"enable_auth": true}}}
 	if id := c.s.Meta("elevenlabs_agent_id"); id != "" {
-		if _, err := c.do("PATCH", "/convai/agents/"+id, body); err != nil {
+		_, err := c.do("PATCH", "/convai/agents/"+id, body)
+		if err == nil {
+			c.log("  ✓ agent %s updated (%s)", spec.Name, id)
+			return id, nil
+		}
+		if !gone(err) {
 			return "", fmt.Errorf("could not update agent %s: %w", id, err)
 		}
-		c.log("  ✓ agent %s updated (%s)", spec.Name, id)
-		return id, nil
+		c.log("  · agent %s is gone from this account; creating it again", id)
 	}
 	out, err := c.do("POST", "/convai/agents/create", body)
 	if err != nil {
@@ -137,6 +145,9 @@ func (c *client) agent(spec Spec, toolIDs []string) (string, error) {
 	c.log("  ✓ agent %s created (%s)", spec.Name, id)
 	return id, nil
 }
+
+// gone is ElevenLabs saying the remembered id no longer exists (deleted, or another account's).
+func gone(err error) bool { return strings.HasPrefix(err.Error(), "HTTP 404") }
 
 func (c *client) do(method, path string, body any) (map[string]any, error) {
 	b, _ := json.Marshal(body)
