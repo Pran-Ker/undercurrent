@@ -1,0 +1,99 @@
+default_platform(:ios)
+
+BUNDLE_ID   = "com.hebbarpran.undercurrent"
+TEAM_ID     = ENV["APPLE_TEAM_ID"]
+MATCH_REPO  = ENV["MATCH_REPO"]
+
+def asc_api_key
+  app_store_connect_api_key(
+    key_id:         ENV["ASC_KEY_ID"],
+    issuer_id:      ENV["ASC_ISSUER_ID"],
+    key_filepath:   ENV["ASC_KEY_PATH"],
+    duration:       1200,
+    in_house:       false
+  )
+end
+
+platform :ios do
+
+  desc "Create App Store Connect entry (App ID already registered in dev portal)"
+  lane :register do
+    asc_api_key
+    produce(
+      app_identifier: BUNDLE_ID,
+      app_name:       "Undercurrent",
+      team_id:        TEAM_ID,
+      skip_devcenter: true,
+      skip_itc:       false
+    )
+  end
+
+  desc "Generate & store App Store certificates/profiles (run once)"
+  lane :setup_signing do
+    match(
+      api_key:        asc_api_key,
+      type:           "appstore",
+      app_identifier: BUNDLE_ID,
+      team_id:        TEAM_ID,
+      git_url:        MATCH_REPO,
+      readonly:       false
+    )
+  end
+
+  desc "Build and ship to TestFlight"
+  lane :beta do
+    key = asc_api_key
+
+    match(
+      api_key:        key,
+      type:           "appstore",
+      app_identifier: BUNDLE_ID,
+      team_id:        TEAM_ID,
+      git_url:        MATCH_REPO,
+      readonly:       true
+    )
+
+    increment_build_number(
+      build_number: latest_testflight_build_number(
+        api_key:        key,
+        app_identifier: BUNDLE_ID
+      ) + 1,
+      xcodeproj: "Undercurrent.xcodeproj"
+    )
+
+    build_app(
+      scheme:           "Undercurrent",
+      export_method:    "app-store",
+      xcargs:           "CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=\"Apple Distribution\" DEVELOPMENT_TEAM=#{TEAM_ID}",
+      output_directory: "./build",
+      output_name:      "Undercurrent.ipa"
+    )
+
+    upload_to_testflight(
+      api_key:                           key,
+      skip_waiting_for_build_processing: true,
+      distribute_external:               false
+    )
+
+    add_git_tag(tag: "beta/#{lane_context[SharedValues::BUILD_NUMBER]}")
+    push_git_tags
+  end
+
+  desc "Register a new test device"
+  lane :add_device do
+    device_name = UI.input("Device name (e.g. 'Pran iPhone 16'): ")
+    udid        = UI.input("UDID: ")
+    register_devices(
+      api_key: asc_api_key,
+      devices: { device_name => udid },
+      team_id: TEAM_ID
+    )
+    match(
+      api_key:              asc_api_key,
+      type:                 "development",
+      force_for_new_devices: true,
+      git_url:              MATCH_REPO
+    )
+  end
+
+end
