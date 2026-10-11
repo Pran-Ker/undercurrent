@@ -46,6 +46,6 @@ sequenceDiagram
 
 ## Smaller tests
 
-- The demo set takes its stages from the migration: 22 unstaged, 16 staged, 4 closed — `TestTheDemoSetTakesItsStages` ✓
+- The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed — `TestTheDemoSetTakesItsStages` ✓
 - An unbuilt endpoint says so with 501 rather than pretending — `TestUnbuiltEndpointsSaySo` ✓
 - Planned: legal transitions only; `state(at)` on an empty log; a bad webhook signature is rejected; the Keewano payload carries only registered ids.

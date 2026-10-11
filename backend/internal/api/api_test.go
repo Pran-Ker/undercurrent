@@ -61,7 +61,7 @@ func TestTheDemoSetTakesItsStages(t *testing.T) {
 	for _, x := range all {
 		n[x.Stage]++
 	}
-	if len(all) != 42 || n["unstaged"] != 22 || n["staged"] != 16 || n["closed"] != 4 || n["committed"] != 0 {
+	if len(all) != 42 || n["unstaged"] != 16 || n["staged"] != 22 || n["closed"] != 4 || n["committed"] != 0 {
 		t.Fatalf("stages = %v of %d", n, len(all))
 	}
 }
