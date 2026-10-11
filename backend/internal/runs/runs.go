@@ -1,6 +1,7 @@
-// Package runs is the agent at work. A commit invokes a coding agent (Claude Code by default)
-// directly, once per run, and reads its verdict — unless the task names a phone number, in which
-// case the run is a call placed through Dial. A retransform asks the chat model for the operations
+// Package runs is the agent at work: the owner's secretary. A commit invokes an agent command
+// (Claude Code by default) directly, once per run, and reads its verdict — done, needs_you, open or
+// failed — unless the task says call and names a phone number, in which case the run is a call
+// placed through Dial. A retransform asks the chat model for the operations
 // the user's words imply and applies them. No worker, no queue: a run is a goroutine.
 package runs
 
@@ -35,7 +36,7 @@ const Marker = "UNDERCURRENT:"
 
 // Verdict is the last line a commit run must print: `UNDERCURRENT: {...}`.
 type Verdict struct {
-	Outcome     string `json:"outcome"` // done · needs_you · failed
+	Outcome     string `json:"outcome"` // done · needs_you · open · failed
 	Note        string `json:"note"`
 	Question    string `json:"question"`
 	Next        string `json:"next"`
@@ -124,6 +125,8 @@ func (r *Runner) execute(runID string) {
 		r.S.RecordRun(actor, "ask", run.ID, &t, &t, v.Question)
 	case v.Outcome == "done":
 		r.done(run, t, actor, v)
+	case v.Outcome == "open":
+		r.handBack(run, t, actor, "open", v.Note)
 	default:
 		r.fail(run, t, actor, v.Note)
 	}
@@ -224,13 +227,19 @@ func transcriptText(c dial.Call) string {
 }
 
 func (r *Runner) fail(run store.Run, t store.Task, actor, why string) {
+	r.handBack(run, t, actor, "failed", "run failed: "+why)
+}
+
+// handBack returns the task to staged with a note: a failure, or a task that stays open because
+// the owner has not done it yet.
+func (r *Runner) handBack(run store.Run, t store.Task, actor, status, note string) {
 	before := t
 	t.Stage = "staged"
-	t.Note = joinNote(t.Note, "run failed: "+why)
+	t.Note = joinNote(t.Note, note)
 	r.S.Put(t)
 	after, _, _ := r.S.Task(t.ID)
-	r.S.RecordRun(actor, "hand_back", run.ID, &before, &after, why)
-	run.Status, run.Result, run.EndedAt = "failed", why, store.Now()
+	r.S.RecordRun(actor, "hand_back", run.ID, &before, &after, note)
+	run.Status, run.Result, run.EndedAt = status, note, store.Now()
 	r.S.PutRun(run)
 }
 
@@ -287,7 +296,11 @@ func (r *Runner) once(prompt string) (string, error) {
 
 func (r *Runner) commitPrompt(t store.Task, run store.Run) string {
 	var b strings.Builder
-	b.WriteString("You are working one task from a personal task board on the owner's behalf. Do what the task asks as far as you can from this machine — research, write, prepare, draft — and report honestly.\n\n")
+	b.WriteString(`You are the owner's secretary, working one task from their board. Tasks come in two kinds:
+- Things you can do from here — look something up, check a fact, research, draft, prepare: do it and put what you found in the note.
+- Things only the owner can do — go somewhere, meet someone, exercise, buy, sign, attend: do not attempt them. Ask one question: whether it is done ("Did you go to the gym?"). A yes closes the task (outcome done, the note says what they told you); a no or "not yet" keeps it open (outcome open, the note says what they said).
+
+`)
 	fmt.Fprintf(&b, "TASK %s: %s\n", t.ID, t.Text)
 	if t.Context != "" {
 		fmt.Fprintf(&b, "CONTEXT (what the owner added when staging it): %s\n", t.Context)
@@ -311,12 +324,13 @@ func (r *Runner) commitPrompt(t store.Task, run store.Run) string {
 	}
 	b.WriteString(`
 RULES
+- The board is the owner's. Never propose changes to other tasks, schedules, duplicates or due dates: the owner restructures the board themselves. RELATED is background, not a to-do list.
 - Never claim to have done something you did not do. If it needs the owner (a decision, a payment, a login), stop and ask one question.
 - Write a short note of what you did and found: it is what the owner reads next.
 - If finishing this task reveals the obvious next step, name it.
 
 END your reply with exactly one line, the verdict, and nothing after it:
-` + Marker + ` {"outcome": "done" | "needs_you" | "failed", "note": "<what you did, 1-4 sentences>", "question": "<only when needs_you>", "next": "<the next step as a task, or empty>", "next_context": "<context for it, or empty>"}
+` + Marker + ` {"outcome": "done" | "needs_you" | "open" | "failed", "note": "<what you did or what the owner said, 1-4 sentences>", "question": "<only when needs_you>", "next": "<the next step as a task, or empty>", "next_context": "<context for it, or empty>"}
 `)
 	return b.String()
 }
@@ -351,7 +365,7 @@ func parseVerdict(out string) (Verdict, error) {
 		return v, fmt.Errorf("verdict is not JSON: %w", err)
 	}
 	switch v.Outcome {
-	case "done", "needs_you", "failed":
+	case "done", "needs_you", "open", "failed":
 		return v, nil
 	}
 	return v, fmt.Errorf("verdict outcome %q", v.Outcome)

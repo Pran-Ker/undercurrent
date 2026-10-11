@@ -42,6 +42,11 @@ same board.
 A staged task can be retransformed — rewritten, enriched, split, or completed with the next step
 yielded. Closing and editing never need an agent. There is no erase.
 
+The agent is the owner's secretary. Committed to it, a task is either something it can do from the
+machine (look up, research, draft, call through Dial), which it does and reports in the note, or
+something only the owner can do (go to the gym), where it asks whether it is done and closes on a
+yes. It never restructures the board: no schedules, duplicates or due dates. The owner does that.
+
 ## Status
 
 Built and tested: the store, the migration, the demo set, the board and its direct actions, commit
@@ -90,5 +95,7 @@ go run ./cmd/undercurrent elevenlabs sync      # creates or updates the agent an
 Put the printed id in `.env` as `ELEVENLABS_AGENT_ID`, with `ELEVENLABS_API_KEY` and a
 `LIVE_TOOL_SECRET` of your choosing. The tools are **client tools**: the board page (and later the
 app) runs them against the local backend, so nothing needs a public URL or a tunnel. The page's
-**Call** button starts the conversation on a signed URL; when it ends, the page posts the transcript
-back and the backend keeps it as a live session with a one-line summary.
+**Call** button starts the conversation on a signed URL and hands the agent the whole board as a
+dynamic variable, so it knows every task from the first word and the owner can say where each one
+should sit (`move_task`). When the call ends, the page posts the transcript back and the backend
+keeps it as a live session with a one-line summary.

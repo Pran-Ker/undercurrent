@@ -108,7 +108,8 @@ func (c *client) agent(spec Spec, toolIDs []string) (string, error) {
 	if spec.LLM != "" {
 		prompt["llm"] = spec.LLM
 	}
-	agent := map[string]any{"first_message": spec.FirstMessage, "language": "en", "prompt": prompt}
+	agent := map[string]any{"first_message": spec.FirstMessage, "language": "en", "prompt": prompt,
+		"dynamic_variables": map[string]any{"dynamic_variable_placeholders": map[string]any{"user_id": "owner", "board": "(not handed over at the start; call list_board)"}}}
 	conv := map[string]any{"agent": agent}
 	if spec.VoiceID != "" {
 		conv["tts"] = map[string]any{"voice_id": spec.VoiceID}

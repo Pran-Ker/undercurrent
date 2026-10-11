@@ -189,7 +189,7 @@ callBtn.onclick = async () => {
     const clientTools = Object.fromEntries(cfg.tools.map(n => [n, p => runTool(n, p || {}, cfg.secret)]));
     transcript = [];
     convo = await Conversation.startSession({
-      signedUrl: signed_url, clientTools,
+      signedUrl: signed_url, clientTools, dynamicVariables: { user_id: "owner", board: cfg.board },
       onConnect: ({ conversationId: id }) => { conversationId = id; callBtn.textContent = "Hang up"; toast("connected — talk"); },
       onMessage: ({ message, role, source }) => { transcript.push({ role: role || (source === "user" ? "user" : "agent"), message }); },
       onDisconnect: async () => {

@@ -57,6 +57,9 @@ func (s *Store) Migrate() error {
 	}
 	sort.Strings(files)
 	for _, f := range files {
+		if s.Meta("migration:"+f) != "" {
+			continue // applied before; the early files are idempotent anyway, the later ones rebuild tables
+		}
 		body, _ := sqlFiles.ReadFile("sql/" + f)
 		for _, stmt := range statements(string(body)) {
 			if stmt == "" {
@@ -66,6 +69,7 @@ func (s *Store) Migrate() error {
 				return fmt.Errorf("%s: %w\n%s", f, err, stmt)
 			}
 		}
+		s.SetMeta("migration:"+f, Now()) // no meta table yet for the first files: fine, they run again harmlessly
 	}
 	return nil
 }

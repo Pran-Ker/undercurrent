@@ -201,6 +201,14 @@ func TestI5LiveToolsReadBackThenLand(t *testing.T) {
 	if got := strings.Join(actions(t, srv, st[0].ID), " "); got != "live:conv1:add live:conv1:commit agent:close" {
 		t.Errorf("events = %s", got)
 	}
+	if out := tool("move_task", `{"ref":"`+st[0].ID+`","stage":"unstaged","conversation_id":"conv1"}`); out["ok"] != true || !strings.Contains(out["result"].(string), "now unstaged") {
+		t.Fatalf("move: %v", out)
+	}
+	var cfg map[string]any
+	call(t, srv, "GET", "/live/config", "", &cfg)
+	if b, _ := cfg["board"].(string); !strings.Contains(b, "[unstaged] book the dentist") {
+		t.Errorf("the config should carry the board for the agent: %v", cfg["board"])
+	}
 	req, _ := http.NewRequest("POST", srv.URL+"/live/tools/list_board", strings.NewReader("{}"))
 	req.Header.Set("X-Live-Secret", "wrong")
 	resp, _ := http.DefaultClient.Do(req)
@@ -237,6 +245,22 @@ func TestI6AnAgentQuestionIsAnsweredAndTheRunResumes(t *testing.T) {
 	call(t, srv, "GET", "/tasks/"+task.ID, "", &task)
 	if task.Stage != "closed" {
 		t.Errorf("task = %+v", task)
+	}
+}
+
+// The secretary asked "did you go?", the owner said not yet: the task stays open on the board.
+func TestOpenVerdictKeepsTheTaskStaged(t *testing.T) {
+	srv := flows(t, fakeAgent(t, verdict("open", "The owner has not gone yet; they plan to tomorrow.", "", "")), nil)
+	task := staged(t, srv, "go to the gym", "weekday mornings")
+	var run store.Run
+	call(t, srv, "POST", "/tasks/"+task.ID+"/commit", "", &run)
+	call(t, srv, "GET", "/runs/"+run.ID, "", &run)
+	call(t, srv, "GET", "/tasks/"+task.ID, "", &task)
+	if run.Status != "open" || task.Stage != "staged" || task.Note != "The owner has not gone yet; they plan to tomorrow." {
+		t.Errorf("run = %+v task = %+v", run, task)
+	}
+	if got := strings.Join(actions(t, srv, task.ID), " "); got != "user:add user:stage user:commit agent:hand_back" {
+		t.Errorf("events = %s", got)
 	}
 }
 

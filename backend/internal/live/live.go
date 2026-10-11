@@ -37,7 +37,7 @@ func New(s *store.Store, r *runs.Runner, recall func(string) string) *Live {
 
 // Tools is the catalogue: name, class, what it does. The agent's configuration is generated
 // from it (elevenlabs/agent.json names the same tools).
-var Tools = []string{"list_board", "add_task", "stage_task", "commit_task", "retransform", "edit_task", "close_task", "answer_agent", "recall"}
+var Tools = []string{"list_board", "add_task", "stage_task", "move_task", "commit_task", "retransform", "edit_task", "close_task", "answer_agent", "recall"}
 
 // Key tools need the owner's word: the first call returns the read-back, the second lands.
 var Key = map[string]bool{"commit_task": true, "retransform": true, "edit_task": true, "close_task": true}
@@ -146,6 +146,19 @@ func (l *Live) call(name string, a args, actor string) (map[string]any, error) {
 		return map[string]any{"ok": false, "needs_confirmation": true, "read_back": readBack(name, t, a)}, nil
 	}
 	switch name {
+	case "move_task":
+		if a.Stage != "unstaged" && a.Stage != "staged" {
+			return nil, fmt.Errorf("stage must be unstaged or staged; close_task closes, commit_task commits")
+		}
+		if t.Stage == "committed" {
+			return nil, fmt.Errorf("%s is with the agent; answer it or wait", t.ID)
+		}
+		before := t
+		t.Stage, t.Done = a.Stage, ""
+		l.S.Put(t)
+		after, _, _ := l.S.Task(t.ID)
+		l.S.Record(actor, "move", &before, &after, "")
+		return ok(fmt.Sprintf("%s “%s” is now %s", t.ID, t.Text, t.Stage)), nil
 	case "stage_task":
 		if strings.TrimSpace(a.Context) == "" {
 			return nil, fmt.Errorf("context is required to stage")
@@ -264,10 +277,12 @@ func board(tasks []store.Task) string {
 	return strings.Join(lines, "\n")
 }
 
-// Config handles GET /live/config: what the board page needs to run a call — the agent id and
-// the tool secret. The backend is local; this is not an endpoint to expose.
+// Config handles GET /live/config: what the board page or the app needs to run a call — the agent
+// id, the tool secret, and the board as text to hand the agent as a dynamic variable, so it knows
+// every task from the first word. The backend is local; this is not an endpoint to expose.
 func (l *Live) Config(w http.ResponseWriter, r *http.Request) {
-	reply(w, 200, map[string]any{"agent_id": l.AgentID, "secret": l.Secret, "configured": l.APIKey != "" && l.AgentID != "" && l.Secret != "", "tools": Tools})
+	tasks, _ := l.S.Tasks("")
+	reply(w, 200, map[string]any{"agent_id": l.AgentID, "secret": l.Secret, "configured": l.APIKey != "" && l.AgentID != "" && l.Secret != "", "tools": Tools, "board": board(tasks)})
 }
 
 // SignedURL handles GET /live/signed-url: the app and the page start a private conversation.
