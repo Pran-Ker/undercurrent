@@ -65,6 +65,15 @@ integration tests, one diagram each, in `TESTING.md`.
 
 The mobile app is built (`mobile-app/`, SwiftUI; the call screen runs on the ElevenLabs Swift SDK). Not built: Darwin, Alike as a memory source.
 
+## A shared dev backend
+
+`Dockerfile` at the root builds the backend into one image with the board page and pi as the agent
+command (committed tasks run on OpenRouter's gemini-3.5-flash-lite inside the container). Railway
+builds it as is: `railway init`, set the variables from `.env.example`, `railway up`, `railway
+domain`. Set `UNDERCURRENT_API_KEY` there: with it, every request but the health check and the page
+needs `Authorization: Bearer <key>`, so only people with the key can reach the board.
+`MOBILE_APP.md` has the exact steps.
+
 ## Integrations fail on their own
 
 The board and the agent need no key. Every other integration is off without its key, and its

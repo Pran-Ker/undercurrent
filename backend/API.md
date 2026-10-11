@@ -35,6 +35,12 @@ An **event**:
 
 Actions: `seeded`, `add`, `stage`, `edit`, `close`, `commit`, `retransform`, `ask`, `answer`, `hand_back`, `restore`, `call`.
 
+## The key
+
+With `UNDERCURRENT_API_KEY` set (always, on a public URL), every request except `GET /health` and the
+page carries `Authorization: Bearer <key>` or `X-Api-Key: <key>`; otherwise 401. Without the variable
+the backend is local and open. `X-Actor` names who acted.
+
 ## The board
 
 | Method and path | Body | Returns | Notes |
@@ -66,7 +72,7 @@ is retried three times with backoff; every attempt is a step on the run.
 
 | Method and path | Returns | Notes |
 |---|---|---|
-| `GET /events?task=&actor=&since=` | `[event]` | oldest first |
+| `GET /events?task=&actor=&since=&limit=` | `[event]` | oldest first; `limit=n` keeps the last n (the app's sidebar asks for 20, the page for 50) |
 | `GET /state?at=<timestamp>` | `{at, tasks}` | the board as it was: each task as its last event at or before `at` left it |
 | `GET /who-did-what?since=` | `{since, actors: [{actor, actions, tasks, last_at}]}` | last 24 h by default |
 | `POST /restore?at=` | `{at, restored, closed}` | compensating `restore` events; a task that did not exist then is closed with a note; committed tasks are left to their run; nothing is deleted |

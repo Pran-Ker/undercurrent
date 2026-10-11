@@ -1,0 +1,6 @@
+.git
+.env
+.claude
+mobile-app
+backend/bin
+backend/*.db

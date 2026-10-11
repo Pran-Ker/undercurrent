@@ -2,9 +2,11 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/pran-ker/undercurrent/backend/internal/live"
@@ -52,14 +54,38 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /live/signed-url", a.Live.SignedURL)
 	mux.HandleFunc("POST /live/post-call", a.Live.PostCall)
 	mux.Handle("GET /", http.FileServer(http.Dir(a.UI)))
-	return cors(mux)
+	return cors(auth(os.Getenv("UNDERCURRENT_API_KEY"), mux))
+}
+
+// auth makes the backend fit for a public URL: with UNDERCURRENT_API_KEY set, every request but the
+// health check and the page itself must carry the key, as `Authorization: Bearer <key>` or
+// `X-Api-Key`. Without the key set, nothing changes — the backend is local.
+func auth(key string, h http.Handler) http.Handler {
+	if key == "" {
+		return h
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" || r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			h.ServeHTTP(w, r)
+			return
+		}
+		given := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if given == "" {
+			given = r.Header.Get("X-Api-Key")
+		}
+		if subtle.ConstantTimeCompare([]byte(given), []byte(key)) != 1 {
+			fail(w, 401, "this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>")
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func cors(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Actor")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Actor, Authorization, X-Api-Key, X-Live-Secret")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(204)
 			return
@@ -257,6 +283,9 @@ func (a *API) events(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, 500, err.Error())
 		return
+	}
+	if n, _ := strconv.Atoi(r.URL.Query().Get("limit")); n > 0 && len(evs) > n {
+		evs = evs[len(evs)-n:] // the most recent n, oldest first
 	}
 	writeJSON(w, 200, evs)
 }

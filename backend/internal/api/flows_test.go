@@ -295,6 +295,43 @@ func TestI12OneAgentWorksTheQueueAndAQuestionParksTheTask(t *testing.T) {
 	}
 }
 
+// With UNDERCURRENT_API_KEY set the backend can sit on a public URL: everything but the health
+// check and the page needs the key. /events?limit=n is the last n actions, for the app's sidebar.
+func TestKeyGuardsAPublicBackend(t *testing.T) {
+	t.Setenv("UNDERCURRENT_API_KEY", "shh")
+	srv := flows(t, fakeAgent(t), nil)
+	get := func(path, key string) int {
+		req, _ := http.NewRequest("GET", srv.URL+path, nil)
+		if key != "" {
+			req.Header.Set("Authorization", "Bearer "+key)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if get("/health", "") != 200 || get("/", "") == 401 || get("/tasks", "") != 401 || get("/tasks", "wrong") != 401 || get("/tasks", "shh") != 200 || get("/live/config", "") != 401 {
+		t.Fatal("the key must guard everything but health and the page")
+	}
+	for _, text := range []string{"one", "two", "three"} {
+		req, _ := http.NewRequest("POST", srv.URL+"/tasks", strings.NewReader(fmt.Sprintf(`{"text":%q}`, text)))
+		req.Header.Set("Authorization", "Bearer shh")
+		if resp, _ := http.DefaultClient.Do(req); resp.StatusCode != 201 {
+			t.Fatalf("add with the key: %d", resp.StatusCode)
+		}
+	}
+	req, _ := http.NewRequest("GET", srv.URL+"/events?limit=2", nil)
+	req.Header.Set("X-Api-Key", "shh")
+	resp, _ := http.DefaultClient.Do(req)
+	var evs []store.Event
+	json.NewDecoder(resp.Body).Decode(&evs)
+	if len(evs) != 2 || evs[1].After == nil || evs[1].After.Text != "three" {
+		t.Errorf("limit=2 should be the last two actions, oldest first: %+v", evs)
+	}
+}
+
 // The secretary asked "did you go?", the owner said not yet: the task stays open on the board.
 func TestOpenVerdictKeepsTheTaskStaged(t *testing.T) {
 	srv := flows(t, fakeAgent(t, verdict("open", "The owner has not gone yet; they plan to tomorrow.", "", "")), nil)

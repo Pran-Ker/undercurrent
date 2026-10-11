@@ -77,13 +77,19 @@
 <div class="col" data-stage="closed" style="display:none"><div class="cards"></div></div>
 <div class="toast" id="toast"></div>
 <script>
-const api = (path, opts = {}) => fetch(path, { headers: { "Content-Type": "application/json", "X-Actor": "user" }, ...opts }).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; });
+// a backend on a public URL has a key (UNDERCURRENT_API_KEY); the page asks once and keeps it in this browser
+const keyHeader = () => { const k = localStorage.getItem("undercurrent_key"); return k ? { Authorization: "Bearer " + k } : {}; };
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Actor": "user", ...keyHeader(), ...(opts.headers || {}) } });
+  if (r.status === 401 && !opts.retried) { const k = prompt("This backend needs its key (UNDERCURRENT_API_KEY):"); if (k) { localStorage.setItem("undercurrent_key", k.trim()); return api(path, { ...opts, retried: true }); } }
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j;
+};
 let tasks = [], runs = [], events = [], selected = null, viewingAt = null;
 const toast = m => { const t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); };
 const esc = s => (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 async function load() {
-  [tasks, runs, events] = await Promise.all([api("/tasks"), api("/runs"), api("/events")]);
+  [tasks, runs, events] = await Promise.all([api("/tasks"), api("/runs"), api("/events?limit=50")]); // the slider covers the last 50 actions
   if (viewingAt) { const s = await api("/state?at=" + encodeURIComponent(viewingAt)); tasks = s.tasks; }
   render();
 }
@@ -190,7 +196,7 @@ function callStatus(state, detail) {
 async function runTool(name, params, secret) {
   callStatus("connected", `${name} ${JSON.stringify(params)}`);
   try {
-    const r = await fetch(`/live/tools/${name}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Secret": secret }, body: JSON.stringify({ ...params, conversation_id: conversationId }) });
+    const r = await fetch(`/live/tools/${name}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Secret": secret, ...keyHeader() }, body: JSON.stringify({ ...params, conversation_id: conversationId }) });
     const j = await r.json();
     load();
     const out = j.ok ? j.result : (j.needs_confirmation ? `NEEDS CONFIRMATION — read this back and wait for a yes: ${j.read_back}` : `ERROR: ${j.error}`);
@@ -220,7 +226,7 @@ callBtn.onclick = async () => {
       onDisconnect: async d => {
         callBtn.textContent = "Call"; convo = null;
         callStatus("ended", d && d.reason === "error" ? "the connection dropped: " + (d.message || "") : "");
-        if (transcript.length) await fetch("/live/post-call", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "post_call_transcription", data: { conversation_id: conversationId, transcript, analysis: {} } }) }).catch(() => {});
+        if (transcript.length) await fetch("/live/post-call", { method: "POST", headers: { "Content-Type": "application/json", ...keyHeader() }, body: JSON.stringify({ type: "post_call_transcription", data: { conversation_id: conversationId, transcript, analysis: {} } }) }).catch(() => {});
         load();
       },
       onError: (m, ctx) => callStatus("error", m + (ctx ? " " + JSON.stringify(ctx).slice(0, 200) : "")),
