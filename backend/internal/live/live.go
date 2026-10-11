@@ -90,11 +90,11 @@ func (l *Live) call(name string, a args, actor string) (map[string]any, error) {
 	ok := func(result string) map[string]any { return map[string]any{"ok": true, "result": result} }
 	switch name {
 	case "list_board":
-		tasks, err := l.S.Tasks(a.Stage)
+		text, err := l.boardText(a.Stage)
 		if err != nil {
 			return nil, err
 		}
-		return ok(board(tasks)), nil
+		return ok(text), nil
 	case "recall":
 		if l.Recall == nil {
 			return ok("(nothing to recall)"), nil
@@ -281,8 +281,31 @@ func board(tasks []store.Task) string {
 // id, the tool secret, and the board as text to hand the agent as a dynamic variable, so it knows
 // every task from the first word. The backend is local; this is not an endpoint to expose.
 func (l *Live) Config(w http.ResponseWriter, r *http.Request) {
-	tasks, _ := l.S.Tasks("")
-	reply(w, 200, map[string]any{"agent_id": l.AgentID, "secret": l.Secret, "configured": l.APIKey != "" && l.AgentID != "" && l.Secret != "", "tools": Tools, "board": board(tasks)})
+	text, _ := l.boardText("")
+	reply(w, 200, map[string]any{"agent_id": l.AgentID, "secret": l.Secret, "configured": l.APIKey != "" && l.AgentID != "" && l.Secret != "", "tools": Tools, "board": text})
+}
+
+// boardText is the board as the voice agent reads it, with the questions the agent is waiting on
+// at the end, so a call can ask them and bring the answers back with answer_agent.
+func (l *Live) boardText(stage string) (string, error) {
+	tasks, err := l.S.Tasks(stage)
+	if err != nil {
+		return "", err
+	}
+	out := board(tasks)
+	runs, _ := l.S.Runs("")
+	var qs []string
+	for _, r := range runs {
+		if r.Status == "needs_you" {
+			if t, ok, _ := l.S.Task(r.TaskID); ok {
+				qs = append(qs, fmt.Sprintf("%s “%s” — the agent asks: %s", t.ID, t.Text, r.Question))
+			}
+		}
+	}
+	if len(qs) > 0 {
+		out += "\n\nWAITING FOR THE PERSON'S ANSWER (ask, then answer_agent):\n" + strings.Join(qs, "\n")
+	}
+	return out, nil
 }
 
 // SignedURL handles GET /live/signed-url: the app and the page start a private conversation.

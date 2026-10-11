@@ -42,10 +42,13 @@ same board.
 A staged task can be retransformed — rewritten, enriched, split, or completed with the next step
 yielded. Closing and editing never need an agent. There is no erase.
 
-The agent is the owner's secretary. Committed to it, a task is either something it can do from the
-machine (look up, research, draft, call through Dial), which it does and reports in the note, or
-something only the owner can do (go to the gym), where it asks whether it is done and closes on a
-yes. It never restructures the board: no schedules, duplicates or due dates. The owner does that.
+The agent is the owner's secretary, and there is one of it with one queue: commits line up, it
+takes them in order, one at a time. A task is either something it can do from the machine (look up,
+research, draft, call through Dial), which it does and reports in the note, or something only the
+owner can do (go to the gym), where it asks whether it is done. A question parks that task and the
+agent takes the next one; the answer, from the page, the app or a call, puts the task back in line,
+and a yes closes it. It never restructures the board: no schedules, duplicates or due dates. The
+owner does that. The queue survives a restart: runs left queued are taken up again.
 
 ## Status
 
@@ -55,7 +58,7 @@ retransforms through the chat model, bounded retries and hand-back, the event lo
 moment and restore, who-did-what, the voice agent's client tools with mechanical confirmation, the
 signed URL, the post-call transcript, recall across the board and your coding conversations, the
 Keewano forwarder (off without a key), calls out through Dial for committed tasks that name a phone
-number, the internal board page, and the ElevenLabs agent sync from `elevenlabs/agent.json`. Eleven
+number, the internal board page, and the ElevenLabs agent sync from `elevenlabs/agent.json`. Twelve
 integration tests, one diagram each, in `TESTING.md`.
 
 Not built: the mobile app (spec in `MOBILE_APP.md`), Darwin, Alike as a memory source.

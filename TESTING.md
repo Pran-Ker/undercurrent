@@ -227,6 +227,34 @@ sequenceDiagram
   A->>A: the agent command, as for any task
 ```
 
+## I12 · one agent works the queue; a question parks the task — `TestI12OneAgentWorksTheQueueAndAQuestionParksTheTask`
+
+The only test on the real queue (the others run the agent in the request). The scripted agent's
+lines are consumed in order, which is how the test knows the gym was taken first.
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant Q as the one agent (queue)
+  participant G as agent command
+  participant V as voice agent
+  U->>A: POST /tasks/gym/commit, POST /tasks/weather/commit
+  A->>Q: run 1, run 2 queued in that order
+  Q->>G: run 1 · gym
+  G-->>Q: needs_you "Did you go to the gym?"
+  Q->>A: run 1 parked, gym stays committed; next
+  Q->>G: run 2 · weather
+  G-->>Q: done "sunny, 61°F"
+  Q->>A: weather closed with the note
+  V->>A: GET /live/config — the board text ends with the waiting question
+  U->>A: POST /runs/1/answer "yes, this morning"
+  A->>Q: run 1 queued again
+  Q->>G: run 1 with the answer
+  G-->>Q: done "the owner went"
+  Q->>A: gym closed
+```
+
 ## Smaller tests
 
 - The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed — `TestTheDemoSetTakesItsStages`

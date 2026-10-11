@@ -1,8 +1,9 @@
-// Package runs is the agent at work: the owner's secretary. A commit invokes an agent command
-// (Claude Code by default) directly, once per run, and reads its verdict — done, needs_you, open or
-// failed — unless the task says call and names a phone number, in which case the run is a call
-// placed through Dial. A retransform asks the chat model for the operations
-// the user's words imply and applies them. No worker, no queue: a run is a goroutine.
+// Package runs is the agent at work: the owner's secretary. There is one agent and one queue:
+// commits line up, the agent takes them in order, a run that asks parks its task and the next is
+// taken, an answer puts the task back in line. A run invokes an agent command (Claude Code by
+// default) once and reads its verdict — done, needs_you, open or failed — unless the task says call
+// and names a phone number, in which case the run is a call placed through Dial. A retransform asks
+// the chat model for the operations the user's words imply and applies them.
 package runs
 
 import (
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pran-ker/undercurrent/backend/internal/dial"
@@ -30,6 +32,8 @@ type Runner struct {
 	Recall   func(string) string
 	Chat     func(system, user string) (string, error) // the chat model, JSON out — for retransforms and call summaries
 	Dial     *dial.Client                              // DIAL_API_KEY: a committed task that names a phone number is placed as a call
+	queue    chan string                               // the commit queue: one agent takes runs in order
+	worker   sync.Once
 }
 
 const Marker = "UNDERCURRENT:"
@@ -75,7 +79,7 @@ func (r *Runner) Commit(t store.Task, actor string) (store.Run, error) {
 
 // Answer resumes a run that asked.
 func (r *Runner) Answer(run store.Run, answer, actor string) (store.Run, error) {
-	run.Answer, run.Status = answer, "running"
+	run.Answer, run.Status = answer, "queued"
 	run.Steps = append(run.Steps, store.Step{At: store.Now(), Kind: "answer", Note: answer})
 	if err := r.S.PutRun(run); err != nil {
 		return run, err
@@ -86,12 +90,35 @@ func (r *Runner) Answer(run store.Run, answer, actor string) (store.Run, error) 
 	return run, nil
 }
 
+// start puts the run in the queue. One goroutine works it, so tasks are taken in commit order and
+// one at a time; in Sync mode (tests) the run executes in the request.
 func (r *Runner) start(runID string) {
 	if r.Sync {
 		r.execute(runID)
 		return
 	}
-	go r.execute(runID)
+	r.worker.Do(func() {
+		r.queue = make(chan string, 1024)
+		go func() {
+			for id := range r.queue {
+				r.execute(id)
+			}
+		}()
+	})
+	r.queue <- runID
+}
+
+// Resume re-queues the runs a previous process left queued or running, oldest first.
+func (r *Runner) Resume() int {
+	runs, _ := r.S.Runs("")
+	n := 0
+	for i := len(runs) - 1; i >= 0; i-- {
+		if runs[i].Status == "queued" || runs[i].Status == "running" {
+			r.start(runs[i].ID)
+			n++
+		}
+	}
+	return n
 }
 
 func (r *Runner) execute(runID string) {

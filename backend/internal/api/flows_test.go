@@ -41,7 +41,9 @@ func verdict(outcome, note, question, next string) string {
 func flows(t *testing.T, agent string, chat http.HandlerFunc) *httptest.Server {
 	t.Helper()
 	t.Setenv("AGENT_CMD", agent)
-	t.Setenv("UNDERCURRENT_SYNC_RUNS", "1")
+	if os.Getenv("UNDERCURRENT_SYNC_RUNS") == "" {
+		t.Setenv("UNDERCURRENT_SYNC_RUNS", "1") // I12 sets 0 first to use the real queue
+	}
 	t.Setenv("LIVE_TOOL_SECRET", "s3cret")
 	t.Setenv("ELEVENLABS_WEBHOOK_SECRET", "wh-secret")
 	if chat != nil {
@@ -245,6 +247,51 @@ func TestI6AnAgentQuestionIsAnsweredAndTheRunResumes(t *testing.T) {
 	call(t, srv, "GET", "/tasks/"+task.ID, "", &task)
 	if task.Stage != "closed" {
 		t.Errorf("task = %+v", task)
+	}
+}
+
+// I12 · one agent, one queue: two commits are taken in order; the first asks and parks its task,
+// the second is done meanwhile; the open question travels with the board to the voice agent; the
+// answer puts the first back in line and it closes.
+func TestI12OneAgentWorksTheQueueAndAQuestionParksTheTask(t *testing.T) {
+	t.Setenv("UNDERCURRENT_SYNC_RUNS", "0")
+	srv := flows(t, fakeAgent(t, verdict("needs_you", "", "Did you go to the gym?", ""), verdict("done", "Looked it up: sunny, 61°F.", "", ""), verdict("done", "The owner went this morning.", "", "")), nil)
+	gym := staged(t, srv, "go to the gym", "weekday mornings")
+	weather := staged(t, srv, "what is the weather today", "San Francisco")
+	var r1, r2 store.Run
+	call(t, srv, "POST", "/tasks/"+gym.ID+"/commit", "", &r1)
+	call(t, srv, "POST", "/tasks/"+weather.ID+"/commit", "", &r2)
+	settle := func(id, want string) store.Run {
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			var run store.Run
+			call(t, srv, "GET", "/runs/"+id, "", &run)
+			if run.Status == want {
+				return run
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("run %s is %s, wanted %s", id, run.Status, want)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	settle(r1.ID, "needs_you") // the agent script is consumed in order: the gym got the question line, the weather the done line
+	settle(r2.ID, "done")
+	call(t, srv, "GET", "/tasks/"+gym.ID, "", &gym)
+	call(t, srv, "GET", "/tasks/"+weather.ID, "", &weather)
+	if gym.Stage != "committed" || weather.Stage != "closed" {
+		t.Fatalf("gym = %s weather = %s", gym.Stage, weather.Stage)
+	}
+	var cfg map[string]any
+	call(t, srv, "GET", "/live/config", "", &cfg)
+	if b, _ := cfg["board"].(string); !strings.Contains(b, "Did you go to the gym?") {
+		t.Errorf("the board handed to the voice agent should carry the open question:\n%s", b)
+	}
+	call(t, srv, "POST", "/runs/"+r1.ID+"/answer", `{"answer":"yes, this morning"}`, &r1)
+	settle(r1.ID, "done")
+	call(t, srv, "GET", "/tasks/"+gym.ID, "", &gym)
+	if gym.Stage != "closed" || !strings.Contains(gym.Note, "went") {
+		t.Errorf("gym = %+v", gym)
 	}
 }
 

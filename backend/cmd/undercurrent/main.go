@@ -73,7 +73,11 @@ func main() {
 			port = "8787"
 		}
 		log.Printf("undercurrent on http://127.0.0.1:%s", port)
-		log.Fatal(http.ListenAndServe(":"+port, api.New(s).Routes()))
+		a := api.New(s)
+		if n := a.Runner.Resume(); n > 0 {
+			log.Printf("resumed %d queued runs", n)
+		}
+		log.Fatal(http.ListenAndServe(":"+port, a.Routes()))
 	case "elevenlabs":
 		if len(os.Args) < 3 || os.Args[2] != "sync" {
 			fmt.Println(usage)
