@@ -95,6 +95,10 @@ and WhatsApp by request; five-minute calls, two at a time on new accounts.
 
 - **Take:** `call_phone` as a run tool with the instruction written by the run and the transcript
   landing in the task's note; the limits as test fixtures (a call cut at five minutes).
+- Messaging is the cheap rail when calls are metered: `POST /api/v1/messages` texts from the same
+  number; iMessage and WhatsApp are channels on an iMessage-type number (WhatsApp is a beta that
+  support enables per account). A task that says *text* rather than *call* could go that way and
+  wait for the reply as an event.
 
 ## Alike — alike.work
 

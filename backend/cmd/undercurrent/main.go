@@ -65,6 +65,9 @@ func main() {
 			s.OnEvent = f.OnEvent
 			log.Printf("keewano: forwarding typed events")
 		}
+		if os.Getenv("DIAL_API_KEY") != "" {
+			log.Printf("dial: a committed task that names a phone number is placed as a call")
+		}
 		port := os.Getenv("PORT")
 		if port == "" {
 			port = "8787"
@@ -76,7 +79,7 @@ func main() {
 			fmt.Println(usage)
 			os.Exit(2)
 		}
-		id, err := elevenlabs.Sync(s, filepath.Join("elevenlabs", "agent.json"), os.Getenv("ELEVENLABS_API_KEY"), os.Getenv("PUBLIC_URL"), os.Getenv("LIVE_TOOL_SECRET"), log.Printf)
+		id, err := elevenlabs.Sync(s, filepath.Join("elevenlabs", "agent.json"), os.Getenv("ELEVENLABS_API_KEY"), log.Printf)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -47,21 +47,39 @@ yielded. Closing and editing never need an agent. There is no erase.
 Built and tested: the store, the migration, the demo set, the board and its direct actions, commit
 runs that invoke a coding agent directly and end done or asking, answers that resume a run,
 retransforms through the chat model, bounded retries and hand-back, the event log, the board at any
-moment and restore, who-did-what, the live agent's webhook tools with mechanical confirmation, the
-signed URL, the post-call webhook, recall across the board and your coding conversations, the
-Keewano forwarder (off without a key), the internal board page, and the ElevenLabs agent sync from
-`elevenlabs/agent.json`. Ten integration tests, one diagram each, in `TESTING.md`.
+moment and restore, who-did-what, the voice agent's client tools with mechanical confirmation, the
+signed URL, the post-call transcript, recall across the board and your coding conversations, the
+Keewano forwarder (off without a key), calls out through Dial for committed tasks that name a phone
+number, the internal board page, and the ElevenLabs agent sync from `elevenlabs/agent.json`. Eleven
+integration tests, one diagram each, in `TESTING.md`.
 
-Not built: the mobile app (spec in `MOBILE_APP.md`), phone calls out (Dial), Darwin, Alike as a
-memory source.
+Not built: the mobile app (spec in `MOBILE_APP.md`), Darwin, Alike as a memory source.
 
-## The live agent
+## Calls
+
+A committed task that names a phone number is a call, not a coding job: the run places it through
+[Dial](https://getdial.ai) with the task and its context as the voice agent's instruction, waits for
+it to end, and closes the task with a summary. The transcript comes back as the next step, **Review
+call notes: …**, unstaged with the transcript in its context. A busy, unanswered or failed call hands
+the task back to staged with the reason in its note.
 
 ```sh
-cloudflared tunnel --url http://127.0.0.1:8787     # or any tunnel; put its https URL in PUBLIC_URL
-go run ./cmd/undercurrent elevenlabs sync          # creates the tools and the agent; prints ELEVENLABS_AGENT_ID
+npm install -g @getdial/cli && dial auth login you@example.com    # then verify-otp, register-number, verify-otp --number
 ```
 
-Then set the post-call webhook in the ElevenLabs dashboard to `PUBLIC_URL/live/post-call` and its
-secret in `ELEVENLABS_WEBHOOK_SECRET`. The board page's **Call** button opens the widget on a
-signed URL.
+The last step saves the key (`~/.local/share/dial/auth.v1.json`) and provisions your first number;
+put them in `.env` as `DIAL_API_KEY` and `DIAL_FROM_NUMBER`. Free accounts get five-minute calls,
+two at a time. `go test ./...` never dials: `TestDialLiveCall` places one real call only with
+`DIAL_LIVE_TEST=1` and `DIAL_LIVE_TO` set.
+
+## The voice agent
+
+```sh
+go run ./cmd/undercurrent elevenlabs sync      # creates or updates the agent and its tools from elevenlabs/agent.json
+```
+
+Put the printed id in `.env` as `ELEVENLABS_AGENT_ID`, with `ELEVENLABS_API_KEY` and a
+`LIVE_TOOL_SECRET` of your choosing. The tools are **client tools**: the board page (and later the
+app) runs them against the local backend, so nothing needs a public URL or a tunnel. The page's
+**Call** button starts the conversation on a signed URL; when it ends, the page posts the transcript
+back and the backend keeps it as a live session with a one-line summary.

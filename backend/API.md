@@ -75,9 +75,10 @@ is retried three times with backoff; every attempt is a step on the run.
 
 | Method and path | Body | Returns | Notes |
 |---|---|---|---|
-| `POST /live/tools/:name` | the tool's arguments, plus `conversation_id` | `{ok, result}` · `{ok: false, needs_confirmation, read_back}` · `{ok: false, error}` | requires header `X-Live-Secret`; tools: `list_board`, `add_task`, `stage_task`, `commit_task`, `retransform`, `edit_task`, `close_task`, `answer_agent`, `recall`. `ref` is a task id or enough of its words. Key tools (`commit_task`, `retransform`, `edit_task`, `close_task`) answer with a read-back until called again with `confirmed: true` |
-| `GET /live/signed-url` | | `{signed_url, agent_id}` | for the app and the widget; needs `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` |
-| `POST /live/post-call` | the ElevenLabs post-call webhook | `{ok}` | verified with `ELEVENLABS_WEBHOOK_SECRET` (`ElevenLabs-Signature: t=…,v0=…`, HMAC-SHA256 of `t.body`, 30 min); a `post_call_transcription` becomes a live session and one `call` event |
+| `POST /live/tools/:name` | the tool's arguments, plus `conversation_id` | `{ok, result}` · `{ok: false, needs_confirmation, read_back}` · `{ok: false, error}` | requires header `X-Live-Secret`; tools: `list_board`, `add_task`, `stage_task`, `commit_task`, `retransform`, `edit_task`, `close_task`, `answer_agent`, `recall`. `ref` is a task id or enough of its words. Key tools (`commit_task`, `retransform`, `edit_task`, `close_task`) answer with a read-back until called again with `confirmed: true`. The ElevenLabs agent's tools are client tools: the page or the app receives each call and forwards it here |
+| `GET /live/config` | | `{agent_id, secret, configured, tools}` | what the page or the app needs to run a call; local only |
+| `GET /live/signed-url` | | `{signed_url, agent_id}` | starts a private conversation; needs `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` |
+| `POST /live/post-call` | `{type: "post_call_transcription", data: {conversation_id, transcript, analysis}}` | `{ok}` | from the page when a call ends (unsigned), or from an ElevenLabs post-call webhook (verified with `ELEVENLABS_WEBHOOK_SECRET`: `ElevenLabs-Signature: t=…,v0=…`, HMAC-SHA256 of `t.body`, 30 min). Becomes a live session and one `call` event; a missing summary is written by the chat model |
 
 ## For the app
 

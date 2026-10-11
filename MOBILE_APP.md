@@ -31,7 +31,10 @@ wrote, the next task it yielded.
 **Call** — full screen: status (connecting · listening · speaking), a transcript strip with the
 last lines, the agent's read-back as text with **Yes** / **No** buttons (also answerable by
 voice), and hang up. Started with a signed URL from `GET /live/signed-url` so the agent stays
-private; `dynamic_variables.user_id` is the one user this install belongs to.
+private. The agent's tools are **client tools**: the SDK hands each call to the app, which forwards
+it to `POST /live/tools/<name>` on the backend with the secret from `GET /live/config` and returns
+the result — so the backend needs no public URL. When the call ends the app posts the transcript to
+`POST /live/post-call`.
 
 ## Flows the app must support
 

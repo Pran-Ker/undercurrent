@@ -197,6 +197,33 @@ sequenceDiagram
   A-->>V: the session summary, cited by its conversation id
 ```
 
+## I11 · a committed call task dials and leaves review notes — `TestI11CommittedCallTaskDialsAndLeavesReviewNotes`
+
+The task names a phone number, so the run is a call. Dial is a scripted counterpart here (a fake
+REST server keyed by the number); `TestDialLiveCall` places one real call when `DIAL_LIVE_TEST=1`
+and `DIAL_LIVE_TO` are set, and is skipped otherwise.
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant P as Dial
+  participant M as chat model
+  participant D as database
+  U->>A: POST /tasks/dentist/commit  (text names +1415…)
+  A->>P: POST /api/v1/calls  to, fromNumber, outboundInstruction = the task and its context, Idempotency-Key = run id
+  P-->>A: call queued
+  A->>P: GET /api/v1/calls/{id}  until Terminated and the transcript has landed
+  P-->>A: completed, 83s, transcript
+  A->>M: summarize the transcript
+  M-->>A: one sentence
+  A->>D: event call; task closed with the summary; "Review call notes: …" unstaged with the transcript as context; run done, step call exit 0
+  U->>A: POST /tasks/landlord/commit  (text names +1415…99)
+  A->>P: place, poll
+  P-->>A: no-answer
+  A->>D: event call, task back to staged with "the call was not completed: no-answer", event hand_back, run failed, no review task
+```
+
 ## Smaller tests
 
 - The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed — `TestTheDemoSetTakesItsStages`

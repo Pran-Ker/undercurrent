@@ -40,7 +40,7 @@ Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in `.env` to work on the shared 
 ## Layout
 
 `backend/cmd/undercurrent` the binary · `backend/internal/store` the database and migrations ·
-`backend/internal/api` the HTTP surface · `backend/internal-web-ui` the internal board page ·
+`backend/internal/api` the HTTP surface · `backend/internal/dial` calls out through Dial · `backend/internal-web-ui` the internal board page ·
 `backend/db` schema, migrations and the demo set · `mobile-app` the Expo app.
 
 ## Before you finish

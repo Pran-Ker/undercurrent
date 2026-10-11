@@ -48,6 +48,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /who-did-what", a.whoDidWhat)
 	mux.HandleFunc("POST /restore", a.restore)
 	mux.HandleFunc("POST /live/tools/{name}", a.Live.Tool)
+	mux.HandleFunc("GET /live/config", a.Live.Config)
 	mux.HandleFunc("GET /live/signed-url", a.Live.SignedURL)
 	mux.HandleFunc("POST /live/post-call", a.Live.PostCall)
 	mux.Handle("GET /", http.FileServer(http.Dir(a.UI)))

@@ -1,4 +1,4 @@
-// Package elevenlabs creates or updates the live agent from elevenlabs/agent.json, so its prompt
+// Package elevenlabs creates or updates the voice agent from elevenlabs/agent.json, so its prompt
 // and tools are reviewable in the repo. The ids it minted are kept in the meta table.
 package elevenlabs
 
@@ -45,8 +45,9 @@ type client struct {
 }
 
 // Sync creates every tool and the agent, or updates them when the meta table remembers their ids.
-// publicURL is where the backend is reachable from ElevenLabs; secret is LIVE_TOOL_SECRET.
-func Sync(s *store.Store, specPath, key, publicURL, secret string, log func(string, ...any)) (string, error) {
+// Tools are client tools: the page or the app runs them against the local backend, so nothing
+// here needs a public URL.
+func Sync(s *store.Store, specPath, key string, log func(string, ...any)) (string, error) {
 	raw, err := os.ReadFile(specPath)
 	if err != nil {
 		return "", err
@@ -55,13 +56,13 @@ func Sync(s *store.Store, specPath, key, publicURL, secret string, log func(stri
 	if err := json.Unmarshal(raw, &spec); err != nil {
 		return "", fmt.Errorf("%s: %w", specPath, err)
 	}
-	if key == "" || publicURL == "" || secret == "" {
-		return "", fmt.Errorf("ELEVENLABS_API_KEY, PUBLIC_URL and LIVE_TOOL_SECRET are all needed")
+	if key == "" {
+		return "", fmt.Errorf("ELEVENLABS_API_KEY is needed")
 	}
 	c := &client{key, s, log}
 	var toolIDs []string
 	for _, t := range spec.Tools {
-		id, err := c.tool(t, strings.TrimRight(publicURL, "/")+"/live/tools/"+t.Name, secret)
+		id, err := c.tool(t)
 		if err != nil {
 			return "", fmt.Errorf("tool %s: %w", t.Name, err)
 		}
@@ -70,19 +71,14 @@ func Sync(s *store.Store, specPath, key, publicURL, secret string, log func(stri
 	return c.agent(spec, toolIDs)
 }
 
-func (c *client) tool(t Tool, url, secret string) (string, error) {
+func (c *client) tool(t Tool) (string, error) {
 	props := map[string]any{}
 	for name, p := range t.Params {
 		props[name] = map[string]any{"type": p.Type, "description": p.Description}
 	}
-	props["conversation_id"] = map[string]any{"type": "string", "dynamic_variable": "system__conversation_id"}
 	body := map[string]any{"tool_config": map[string]any{
-		"type": "webhook", "name": t.Name, "description": t.Description, "response_timeout_secs": 60,
-		"api_schema": map[string]any{
-			"url": url, "method": "POST", "content_type": "application/json",
-			"request_body_schema": map[string]any{"type": "object", "properties": props, "required": t.Required},
-			"request_headers":     map[string]any{"X-Live-Secret": secret},
-		},
+		"type": "client", "name": t.Name, "description": t.Description, "expects_response": true, "response_timeout_secs": 60,
+		"parameters": map[string]any{"type": "object", "properties": props, "required": t.Required},
 	}}
 	key := "elevenlabs_tool_" + t.Name
 	if id := c.s.Meta(key); id != "" {

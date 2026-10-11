@@ -1,6 +1,6 @@
-// Package live is the voice surface's side of the backend: the webhook tools an ElevenLabs agent
-// calls, the signed URL that starts a private conversation, and the post-call webhook that keeps
-// the transcript. Key tools answer with a read-back until called again with confirmed: true (S4).
+// Package live is the voice surface's side of the backend: the tools an ElevenLabs agent calls
+// through the page or the app, the signed URL that starts a private conversation, and the
+// post-call transcript that keeps the conversation as a session.
 package live
 
 import (
@@ -264,7 +264,13 @@ func board(tasks []store.Task) string {
 	return strings.Join(lines, "\n")
 }
 
-// SignedURL handles GET /live/signed-url: the app and the widget start a private conversation.
+// Config handles GET /live/config: what the board page needs to run a call — the agent id and
+// the tool secret. The backend is local; this is not an endpoint to expose.
+func (l *Live) Config(w http.ResponseWriter, r *http.Request) {
+	reply(w, 200, map[string]any{"agent_id": l.AgentID, "secret": l.Secret, "configured": l.APIKey != "" && l.AgentID != "" && l.Secret != "", "tools": Tools})
+}
+
+// SignedURL handles GET /live/signed-url: the app and the page start a private conversation.
 func (l *Live) SignedURL(w http.ResponseWriter, r *http.Request) {
 	if l.APIKey == "" || l.AgentID == "" {
 		reply(w, 503, map[string]string{"error": "ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID are not set"})
@@ -319,6 +325,9 @@ func (l *Live) PostCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	x := store.Session{ConversationID: p.Data.ConversationID, Transcript: p.Data.Transcript, Summary: p.Data.Analysis.Summary}
+	if x.Summary == "" && len(x.Transcript) > 0 && l.Runner != nil && l.Runner.Chat != nil {
+		x.Summary = l.summarize(x.Transcript)
+	}
 	if p.Data.Metadata.Start > 0 {
 		x.StartedAt = time.Unix(p.Data.Metadata.Start, 0).UTC().Format("2006-01-02T15:04:05Z")
 		x.EndedAt = time.Unix(p.Data.Metadata.Start+p.Data.Metadata.Duration, 0).UTC().Format("2006-01-02T15:04:05Z")
@@ -366,4 +375,28 @@ func Sign(body []byte, secret string, now time.Time) string {
 	mac.Write([]byte(ts + "."))
 	mac.Write(body)
 	return "t=" + ts + ",v0=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+// summarize asks the chat model for one plain sentence about a call the page recorded itself;
+// the platform's own webhook brings a summary along, the page cannot.
+func (l *Live) summarize(turns []map[string]any) string {
+	var lines []string
+	for _, t := range turns {
+		role, _ := t["role"].(string)
+		msg, _ := t["message"].(string)
+		if msg != "" {
+			lines = append(lines, role+": "+msg)
+		}
+	}
+	out, err := l.Runner.Chat("Summarize this call between a person and their task assistant in one or two plain sentences, naming the tasks touched. Reply with JSON: {\"summary\": \"...\"}", strings.Join(lines, "\n"))
+	if err != nil {
+		return ""
+	}
+	var v struct {
+		Summary string `json:"summary"`
+	}
+	if i, j := strings.Index(out, "{"), strings.LastIndex(out, "}"); i >= 0 && j > i {
+		json.Unmarshal([]byte(out[i:j+1]), &v)
+	}
+	return v.Summary
 }

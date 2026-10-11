@@ -171,15 +171,35 @@ slider.addEventListener("input", async () => {
 });
 document.getElementById("back-to-now").onclick = () => { viewingAt = null; load(); };
 document.getElementById("restore").onclick = () => { if (!viewingAt) return toast("move the slider first"); if (!confirm("Restore the board to " + viewingAt + "? Nothing is deleted; compensating events are written.")) return; act(() => api("/restore?at=" + encodeURIComponent(viewingAt), { method: "POST" }).then(j => toast(`restored ${j.restored}, closed ${j.closed}`)), null).then(() => { viewingAt = null; load(); }); };
-// the call
-document.getElementById("call").onclick = async () => {
+// the call: the ElevenLabs client SDK in this page; its client tools call this backend, so no public URL
+let convo = null, transcript = [], conversationId = "";
+const callBtn = document.getElementById("call");
+async function runTool(name, params, secret) {
+  const r = await fetch(`/live/tools/${name}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Secret": secret }, body: JSON.stringify({ ...params, conversation_id: conversationId }) });
+  const j = await r.json();
+  return j.ok ? j.result : (j.needs_confirmation ? `NEEDS CONFIRMATION — read this back and wait for a yes: ${j.read_back}` : `ERROR: ${j.error}`);
+}
+callBtn.onclick = async () => {
+  if (convo) { await convo.endSession(); return; }
   try {
-    const { signed_url, agent_id } = await api("/live/signed-url");
-    if (!document.querySelector("script[data-el]")) { const s = document.createElement("script"); s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed"; s.async = true; s.dataset.el = "1"; document.body.appendChild(s); }
-    document.querySelectorAll("elevenlabs-convai").forEach(e => e.remove());
-    const w = document.createElement("elevenlabs-convai"); w.setAttribute("agent-id", agent_id); w.setAttribute("signed-url", signed_url); document.body.appendChild(w);
-    toast("the call widget is at the bottom right");
-  } catch (e) { toast("call not configured: " + e.message); }
+    const cfg = await api("/live/config");
+    if (!cfg.configured) return toast("set ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID and LIVE_TOOL_SECRET, run `undercurrent elevenlabs sync`");
+    const { signed_url } = await api("/live/signed-url");
+    const { Conversation } = await import("https://esm.sh/@elevenlabs/client@1.26.0");
+    const clientTools = Object.fromEntries(cfg.tools.map(n => [n, p => runTool(n, p || {}, cfg.secret)]));
+    transcript = [];
+    convo = await Conversation.startSession({
+      signedUrl: signed_url, clientTools,
+      onConnect: ({ conversationId: id }) => { conversationId = id; callBtn.textContent = "Hang up"; toast("connected — talk"); },
+      onMessage: ({ message, role, source }) => { transcript.push({ role: role || (source === "user" ? "user" : "agent"), message }); },
+      onDisconnect: async () => {
+        callBtn.textContent = "Call"; convo = null;
+        if (transcript.length) await fetch("/live/post-call", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "post_call_transcription", data: { conversation_id: conversationId, transcript, analysis: {} } }) }).catch(() => {});
+        toast("call ended"); load();
+      },
+      onError: m => toast("call: " + m),
+    });
+  } catch (e) { toast("call: " + e.message); callBtn.textContent = "Call"; convo = null; }
 };
 load(); setInterval(() => { if (!viewingAt) load(); }, 4000);
 </script>
