@@ -14,6 +14,7 @@ struct RootView: View {
                     case .run(let id): RunView(runID: id)
                     case .insights: InsightsView()
                     case .settings: SettingsView()
+                    case .time: TimeTravelView()
                     }
                 }
         }
@@ -26,4 +27,5 @@ enum Route: Hashable {
     case run(String)
     case insights
     case settings
+    case time
 }

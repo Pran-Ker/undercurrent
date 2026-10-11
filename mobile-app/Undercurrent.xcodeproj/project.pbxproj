@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		074AFDF5A6DAB5D87A612E76 /* MockBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B23D97E2D8014975D3344A /* MockBackend.swift */; };
+		153818FF8262CCAA040EF547 /* LiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A3DD874015D491169D2E5C0 /* LiveTests.swift */; };
 		1676FAF1D3A5850C70AB61DA /* BoardTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E720E0E41F8DF47C5A1D590 /* BoardTask.swift */; };
 		31ED5A1B8D532E103A6BBF62 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A175BC81223DFAF479E999AA /* Components.swift */; };
 		3C9391175E459891ACA9D1F1 /* LiveSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E6343F5595C59C019F20DBD /* LiveSession.swift */; };
@@ -18,7 +19,9 @@
 		6FC550176898087D4720F3B0 /* AddSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420A24C16CA5917BF2D86DE2 /* AddSheet.swift */; };
 		7053C2F904873210019B59C8 /* ElevenLabs in Frameworks */ = {isa = PBXBuildFile; productRef = B2B87596D78132FF7FDEE244 /* ElevenLabs */; };
 		714E0A0F246638AAFFDEE4D9 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D351F3A1B422ABE7FC04A62 /* TaskDetailView.swift */; };
+		74F3E3F35BAC0AC92D13C7ED /* TimeTravelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3723AC3DB03F6DEC1AF324C /* TimeTravelUITests.swift */; };
 		84F3512B5754ABA00183092C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205C06B3D1B54D5A17053C27 /* Theme.swift */; };
+		87AD9AB02A0BA52BB3DDB264 /* TimeTravelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EC70F30D2094C70085897B /* TimeTravelView.swift */; };
 		8B628B9EC631DF6507E3C57A /* Backend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE71AADB393B62F830C417E /* Backend.swift */; };
 		9E11201543A80EB8B67BD6ED /* UndercurrentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E049F2587D64D10C34304D /* UndercurrentApp.swift */; };
 		AB4ED08ED716A12EE86B3002 /* ModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2B3D10A35E02945399EE66 /* ModelTests.swift */; };
@@ -62,6 +65,7 @@
 		2E6343F5595C59C019F20DBD /* LiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSession.swift; sourceTree = "<group>"; };
 		32B23D97E2D8014975D3344A /* MockBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockBackend.swift; sourceTree = "<group>"; };
 		345FED9B070C80F82F1FAEFF /* Undercurrent.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Undercurrent.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A3DD874015D491169D2E5C0 /* LiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTests.swift; sourceTree = "<group>"; };
 		3D351F3A1B422ABE7FC04A62 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		420A24C16CA5917BF2D86DE2 /* AddSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSheet.swift; sourceTree = "<group>"; };
 		5F2341FA9F390A0BE7CE01E6 /* RetransformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetransformView.swift; sourceTree = "<group>"; };
@@ -71,10 +75,12 @@
 		8CE71AADB393B62F830C417E /* Backend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backend.swift; sourceTree = "<group>"; };
 		9FF184E7193B4EC8ECC71254 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A175BC81223DFAF479E999AA /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		A3723AC3DB03F6DEC1AF324C /* TimeTravelUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTravelUITests.swift; sourceTree = "<group>"; };
 		A772D3E1ACA80444363DD60A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A95249EE47C2F12B80C641D1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A9E049F2587D64D10C34304D /* UndercurrentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndercurrentApp.swift; sourceTree = "<group>"; };
 		AA2A8920BBD632C139654E2A /* Board.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Board.swift; sourceTree = "<group>"; };
+		D8EC70F30D2094C70085897B /* TimeTravelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTravelView.swift; sourceTree = "<group>"; };
 		E2E7ED5296CCDF866B64CA33 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		E8E629D01883B0A485405B0A /* UndercurrentUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = UndercurrentUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0CEE65D97E592D3B044DD11 /* CallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallView.swift; sourceTree = "<group>"; };
@@ -124,6 +130,7 @@
 			children = (
 				04D89F2096A95FD85B374366 /* BackendTests.swift */,
 				27FD37CE984F926787825570 /* InsightsTests.swift */,
+				3A3DD874015D491169D2E5C0 /* LiveTests.swift */,
 				7E2B3D10A35E02945399EE66 /* ModelTests.swift */,
 			);
 			name = UndercurrentTests;
@@ -152,6 +159,7 @@
 				0B32D1C0ADB0BCF5D36D7D1E /* RunView.swift */,
 				A772D3E1ACA80444363DD60A /* SettingsView.swift */,
 				3D351F3A1B422ABE7FC04A62 /* TaskDetailView.swift */,
+				D8EC70F30D2094C70085897B /* TimeTravelView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -159,6 +167,7 @@
 		B72DC72D5431E22A2F5C65AE /* UndercurrentUITests */ = {
 			isa = PBXGroup;
 			children = (
+				A3723AC3DB03F6DEC1AF324C /* TimeTravelUITests.swift */,
 				6EC7B0F15C1ECCCFDF90CC84 /* UndercurrentUITests.swift */,
 			);
 			name = UndercurrentUITests;
@@ -334,6 +343,7 @@
 				E9F07387D80A490CEF12F8E8 /* SettingsView.swift in Sources */,
 				714E0A0F246638AAFFDEE4D9 /* TaskDetailView.swift in Sources */,
 				84F3512B5754ABA00183092C /* Theme.swift in Sources */,
+				87AD9AB02A0BA52BB3DDB264 /* TimeTravelView.swift in Sources */,
 				9E11201543A80EB8B67BD6ED /* UndercurrentApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -342,6 +352,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				74F3E3F35BAC0AC92D13C7ED /* TimeTravelUITests.swift in Sources */,
 				5CCF468D7E26902E9DAD0CF3 /* UndercurrentUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -352,6 +363,7 @@
 			files = (
 				E1A0F11CF3FF3CE6DCCE91DC /* BackendTests.swift in Sources */,
 				FCE29A27B2DF415FC9A39C76 /* InsightsTests.swift in Sources */,
+				153818FF8262CCAA040EF547 /* LiveTests.swift in Sources */,
 				AB4ED08ED716A12EE86B3002 /* ModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -376,6 +388,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				BACKEND_KEY = "";
 				BACKEND_URL = "http://127.0.0.1:8790";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -526,6 +539,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				BACKEND_KEY = "";
 				BACKEND_URL = "http://127.0.0.1:8790";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;

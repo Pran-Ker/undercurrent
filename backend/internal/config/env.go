@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
+// UNDERCURRENT_DOTENV=0 skips the file: a throwaway local backend must not inherit the shared board.
 func Load() {
+	if os.Getenv("UNDERCURRENT_DOTENV") == "0" {
+		return
+	}
 	for _, p := range []string{".env", filepath.Join("..", ".env")} {
 		raw, err := os.ReadFile(p)
 		if err != nil {

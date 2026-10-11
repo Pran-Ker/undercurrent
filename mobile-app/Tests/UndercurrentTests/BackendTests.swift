@@ -5,16 +5,21 @@ import XCTest
 final class BackendTests: XCTestCase {
     var backend: Backend!
 
-    static let defaultNotBuilt: Set<String> = ["commit", "retransform", "runs", "answer", "signed-url"]
-
     override func setUp() {
         MockBackend.shared.reset()
-        MockBackend.shared.notBuilt = Self.defaultNotBuilt
+        MockBackend.requiredKey = ""
         backend = Backend(baseURL: MockBackend.baseURL, actor: "user", session: MockURLProtocol.session)
     }
 
     override func tearDown() {
-        MockBackend.shared.notBuilt = Self.defaultNotBuilt
+        MockBackend.requiredKey = ""
+    }
+
+    // A board that never polls on its own, so the mock's agent only moves when a test reads the runs.
+    @MainActor func quietBoard(_ b: Backend? = nil) -> Board {
+        let board = Board(backend: b ?? backend)
+        board.pollInterval = .seconds(3600)
+        return board
     }
 
     func testHealthAndTasks() async throws {
@@ -53,10 +58,13 @@ final class BackendTests: XCTestCase {
         do { _ = try await backend.edit("o5p6", text: "x"); XCTFail() } catch let e as BackendError {
             guard case .refused = e else { return XCTFail("\(e)") }
         } catch { XCTFail() }
-        do { _ = try await backend.commit("g7h8"); XCTFail() } catch let e as BackendError {
-            XCTAssertTrue(e.isNotBuilt)
+        do { _ = try await backend.commit("a1b2"); XCTFail() } catch let e as BackendError {
+            guard case .refused = e else { return XCTFail("\(e)") }
         } catch { XCTFail() }
-        do { _ = try await backend.retransform("g7h8", instruction: "split"); XCTFail() } catch let e as BackendError {
+        do { _ = try await backend.retransform("a1b2", instruction: "split"); XCTFail() } catch let e as BackendError {
+            guard case .refused = e else { return XCTFail("\(e)") }
+        } catch { XCTFail() }
+        do { _ = try await backend.live(); XCTFail() } catch let e as BackendError {
             XCTAssertTrue(e.isNotBuilt)
         } catch { XCTFail() }
     }
@@ -80,11 +88,11 @@ final class BackendTests: XCTestCase {
 
     @MainActor
     func testBoardRefreshesAndActs() async throws {
-        let board = Board(backend: backend)
+        let board = quietBoard()
         await board.refresh()
         XCTAssertEqual(board.tasks.count, 10)
         XCTAssertNil(board.error)
-        XCTAssertFalse(board.runsAvailable)   // the mock answers 501 for runs by default
+        XCTAssertTrue(board.runsAvailable)
         try await board.add(text: "New line")
         XCTAssertEqual(board.tasks.count, 11)
         XCTAssertEqual(board.tasks(in: .unstaged).count, 4)
@@ -106,15 +114,24 @@ final class BackendTests: XCTestCase {
     }
 
     @MainActor
-    func testBoardRunsWhenBuilt() async throws {
-        MockBackend.shared.notBuilt = []
-        let board = Board(backend: backend)
+    func testBoardCommitQueuesARunThatAsks() async throws {
+        let board = quietBoard()
         await board.refresh()
         XCTAssertTrue(board.runsAvailable)
         XCTAssertEqual(board.needsYou.count, 1)
         XCTAssertEqual(board.run(for: "m3n4")?.status, .needsYou)
-        try await board.commit("g7h8")
+        let run = try await board.commit("g7h8")
+        XCTAssertEqual(run.status, .queued)                          // the 202 reply
+        XCTAssertEqual(run.taskID, "g7h8")
         XCTAssertEqual(board.task("g7h8")?.stage, .committed)
+        XCTAssertEqual(board.run(for: "g7h8")?.id, run.id)
+        XCTAssertEqual(board.run(for: "g7h8")?.status, .needsYou)    // the refetch read the agent's question
+        XCTAssertFalse(board.run(for: "g7h8")!.question.isEmpty)
+        XCTAssertEqual(board.needsYou.count, 2)
+        XCTAssertEqual(board.events(for: "g7h8").map(\.action), ["stage", "commit", "ask"])
+        XCTAssertEqual(board.events(for: "g7h8").last?.runID, run.id)
+        XCTAssertTrue(board.polling)
+        board.stopPolling()
     }
 
     // MARK: Helpers
@@ -226,23 +243,24 @@ final class BackendTests: XCTestCase {
         let run = #"{"id":"r1x9","task_id":"k79l","kind":"commit","status":"queued","steps":[],"cost_cents":0,"started_at":"2026-10-11T19:02:11Z"}"#
         let reply = try await stub(202, run).commit("k79l")
         XCTAssertEqual(StubURLProtocol.lastRequest?.url?.path, "/tasks/k79l/commit")
-        if reply.text.isEmpty {
-            XCTExpectFailure("Backend.swift commit(): decodes the run reply as a BoardTask, yielding id=run id, stage=unstaged, text=\"\"") {
-                XCTFail("commit returned a task-shaped reply from a run body: \(reply)")
-            }
-        }
+        XCTAssertEqual(StubURLProtocol.lastRequest?.httpMethod, "POST")
+        XCTAssertEqual(reply.id, "r1x9")
+        XCTAssertEqual(reply.taskID, "k79l")
+        XCTAssertEqual(reply.status, .queued)
+        XCTAssertEqual(reply.startedAt, "2026-10-11T19:02:11Z")
+        await expect(.refused("only a staged task can be committed")) { try await self.stub(409, #"{"error":"only a staged task can be committed"}"#).commit("a1b2") }
     }
 
     func testRetransformRepliesWithRunAndSayPerTheContract() async throws {
         let ok = #"{"run":{"id":"r2y8","task_id":"k79l","kind":"retransform","status":"done","steps":[]},"say":"Split into three."}"#
-        do {
-            _ = try await stub(200, ok).retransform("k79l", instruction: "split this into three")
-        } catch {
-            XCTExpectFailure("Backend.swift retransform(): decodes {run, say} as a BoardTask, which has no id, so a successful retransform surfaces as an error") {
-                XCTFail("a successful retransform threw: \(error)")
-            }
-        }
+        let r = try await stub(200, ok).retransform("k79l", instruction: "split this into three")
         XCTAssertEqual(StubURLProtocol.lastRequest?.url?.path, "/tasks/k79l/retransform")
+        XCTAssertEqual(r.say, "Split into three.")
+        XCTAssertEqual(r.run.id, "r2y8")
+        XCTAssertEqual(r.run.status, .done)
+        XCTAssertEqual(r.run.kind, "retransform")
+        let silent = try await stub(200, #"{"run":{"id":"r3"}}"#).retransform("k79l", instruction: "x")
+        XCTAssertEqual(silent.say, "")
         let noOps = await failure { try await self.stub(502, #"{"error":"the model gave no operations","run":{"id":"r2y8"}}"#).retransform("k79l", instruction: "x") }
         XCTAssertEqual(noOps, .http(502, "the model gave no operations"))
         await expect(.refused("only a staged task can be retransformed")) { try await self.stub(409, #"{"error":"only a staged task can be retransformed"}"#).retransform("a1b2", instruction: "x") }
@@ -275,7 +293,7 @@ final class BackendTests: XCTestCase {
 
         _ = try await stub(200, task).close("a1b2")
         XCTAssertEqual(try body().isEmpty, true)
-        _ = try await stub(200, task).retransform("a1b2", instruction: "split")
+        _ = try await stub(200, #"{"run":{"id":"r1"},"say":"ok"}"#).retransform("a1b2", instruction: "split")
         XCTAssertEqual(try body()["instruction"] as? String, "split")
         XCTAssertEqual(StubURLProtocol.lastRequest?.url?.path, "/tasks/a1b2/retransform")
         _ = try await stub(200, #"{"id":"r1"}"#).answer(run: "r1", "Flow")
@@ -352,7 +370,7 @@ final class BackendTests: XCTestCase {
 
     @MainActor
     func testBoardRefreshesAfterARefusedActionButNotAfterNotBuilt() async throws {
-        let board = Board(backend: backend)
+        let board = quietBoard()
         await board.refresh()
         let first = try XCTUnwrap(board.lastSync)
         do { try await board.close("o5p6"); XCTFail() } catch let e as BackendError {
@@ -361,27 +379,47 @@ final class BackendTests: XCTestCase {
         XCTAssertNil(board.error)                                   // the refetch after the refusal succeeded
         let afterRefused = try XCTUnwrap(board.lastSync)
         XCTAssertGreaterThan(afterRefused, first)
-        do { try await board.commit("g7h8"); XCTFail() } catch let e as BackendError {
+        XCTAssertEqual(board.task("o5p6")?.stage, .closed)
+        let notBuilt = quietBoard(stub(501, #"{"error":"not built yet"}"#))
+        do { try await notBuilt.commit("g7h8"); XCTFail() } catch let e as BackendError {
             XCTAssertTrue(e.isNotBuilt)
         }
-        XCTAssertEqual(board.lastSync, afterRefused)                // not built: nothing changed, no refetch
-        XCTAssertEqual(board.task("g7h8")?.stage, .staged)
-        XCTAssertNil(board.error)                                   // a 501 is a state, not an error
+        XCTAssertNil(notBuilt.lastSync)                             // not built: nothing changed, no refetch
+        XCTAssertNil(notBuilt.error)                                // a 501 is a state, not an error
     }
 
     @MainActor
-    func testBoardAnswersARunWhenBuilt() async throws {
-        MockBackend.shared.notBuilt = []
-        let board = Board(backend: backend)
+    func testBoardAnswersARunAndReadsWhatItYielded() async throws {
+        let board = quietBoard()
         await board.refresh()
         let run = try XCTUnwrap(board.needsYou.first)
         XCTAssertEqual(run.taskID, "m3n4")
+        XCTAssertTrue(board.polling)
         let answered = try await board.answer(run: run.id, "Flow")
-        XCTAssertEqual(answered.status, .running)
+        XCTAssertEqual(answered.status, .running)                   // the 202 reply
         XCTAssertEqual(answered.answer, "Flow")
         XCTAssertTrue(board.needsYou.isEmpty)
-        XCTAssertEqual(board.run(for: "m3n4")?.status, .running)
+        let done = try XCTUnwrap(board.run(for: "m3n4"))             // the refetch read the agent finishing
+        XCTAssertEqual(done.status, .done)
+        XCTAssertFalse(done.result.isEmpty)
+        XCTAssertFalse(done.endedAt.isEmpty)
+        XCTAssertGreaterThan(done.costCents, 0)
+        XCTAssertEqual(done.steps.count, 5)
+        XCTAssertTrue(done.steps.last!.contains("Finished with the answer"))
+        let task = try XCTUnwrap(board.task("m3n4"))
+        XCTAssertEqual(task.stage, .closed)
+        XCTAssertEqual(task.done, Dates.dayString(.now))
+        XCTAssertTrue(task.note.contains("Flow"))
+        let child = try XCTUnwrap(board.children(of: "m3n4").first)
+        XCTAssertEqual(child.stage, .unstaged)
+        XCTAssertEqual(child.parentID, "m3n4")
+        XCTAssertEqual(child.createdBy, "agent")
+        XCTAssertEqual(child.tags, ["home"])
+        XCTAssertEqual(board.events(for: "m3n4").map(\.action), ["answer", "close"])
+        XCTAssertEqual(board.events(for: child.id).map(\.action), ["add"])
+        XCTAssertEqual(board.events(for: child.id).first?.actorKind, "agent")
         XCTAssertNil(board.run(for: "a1b2"))
+        XCTAssertFalse(board.polling)                               // nothing committed any more
     }
 
     @MainActor
@@ -459,10 +497,9 @@ final class BackendTests: XCTestCase {
         XCTAssertEqual(events.map(\.action), ["edit"])
     }
 
-    func testMockRunsRoutesWhenBuilt() async throws {
-        MockBackend.shared.notBuilt = []
-        let all = try await backend.runs()
-        XCTAssertEqual(all.map(\.id), ["r001"])
+    func testMockRunsFollowTheContract() async throws {
+        let fixture = try await backend.runs()
+        XCTAssertEqual(fixture.map(\.id), ["r001"])
         let forTask = try await backend.runs(task: "m3n4")
         XCTAssertEqual(forTask.count, 1)
         let none = try await backend.runs(task: "a1b2")
@@ -470,33 +507,171 @@ final class BackendTests: XCTestCase {
         let r = try await backend.run("r001")
         XCTAssertEqual(r.status, .needsYou)
         XCTAssertEqual(r.steps.count, 3)
+        XCTAssertTrue(r.steps[0].hasPrefix("agent · claude -p"))     // on the wire a step is {at, kind, cmd, exit, ms, output}
+        XCTAssertTrue(r.steps[0].hasSuffix("Searched plumbers within 3 miles"))
+        XCTAssertEqual(r.costCents, 4)
         XCTAssertFalse(r.question.isEmpty)
         await expect(.notFound("no such run")) { try await self.backend.run("r999") }
         await expect(.notFound("no such run")) { try await self.backend.answer(run: "r999", "x") }
+        await expect(.http(400, "answer is required")) { try await self.backend.answer(run: "r001", "  ") }
         await expect(.refused("only a staged task can be committed")) { try await self.backend.commit("a1b2") }
         await expect(.notFound("no such task")) { try await self.backend.commit("zzzz") }
-        let committed = try await backend.commit("g7h8")
+
+        let queued = try await backend.commit("g7h8")
+        XCTAssertEqual(queued.status, .queued)
+        XCTAssertEqual(queued.kind, "commit")
+        XCTAssertEqual(queued.taskID, "g7h8")
+        XCTAssertFalse(queued.startedAt.isEmpty)
+        let committed = try await backend.task("g7h8")
         XCTAssertEqual(committed.stage, .committed)
-        let runs = try await backend.runs(task: "g7h8")
-        XCTAssertEqual(runs.count, 1)
-        XCTAssertEqual(runs.first?.status, .queued)
-        XCTAssertEqual(runs.first?.kind, "commit")
-        let events = try await backend.events(task: "g7h8")
-        XCTAssertEqual(events.map(\.action), ["stage", "commit"])
-        let answered = try await backend.answer(run: "r001", "Flow")
+        await expect(.refused("the agent has it; wait for the run")) { try await self.backend.close("g7h8") }
+        let all = try await backend.runs()                            // newest first; reading moves the agent on
+        XCTAssertEqual(all.map(\.id), [queued.id, "r001"])
+        XCTAssertEqual(all.first?.status, .needsYou)
+        XCTAssertTrue(all.first!.question.contains("File the Q3 taxes"))
+        let asked = try await backend.events(task: "g7h8")
+        XCTAssertEqual(asked.map(\.action), ["stage", "commit", "ask"])
+        XCTAssertEqual(asked.last?.runID, queued.id)
+        XCTAssertEqual(asked.last?.actor, "agent:" + queued.id)
+
+        let answered = try await backend.answer(run: queued.id, "Cheapest")
         XCTAssertEqual(answered.status, .running)
-        // Retransform and the signed URL stay 501 even when runs are "built".
-        await expect(.notBuilt("/tasks/g7h8/retransform")) { try await self.backend.retransform("g7h8", instruction: "split") }
+        XCTAssertEqual(answered.answer, "Cheapest")
+        await expect(.refused("this run is not waiting for an answer")) { try await self.backend.answer(run: queued.id, "again") }
+        let done = try await backend.runs(task: "g7h8")
+        XCTAssertEqual(done.map(\.status), [.done])
+        XCTAssertTrue(done[0].result.contains("Cheapest"))
+        let closed = try await backend.task("g7h8")
+        XCTAssertEqual(closed.stage, .closed)
+        XCTAssertTrue(closed.note.contains("Cheapest"))
+        let children = try await backend.tasks(stage: .unstaged).filter { $0.parentID == "g7h8" }
+        XCTAssertEqual(children.count, 1)
+        XCTAssertEqual(children[0].text, "Follow up on: File the Q3 taxes")
+        let events = try await backend.events(task: "g7h8")
+        XCTAssertEqual(events.map(\.action), ["stage", "commit", "ask", "answer", "close"])
+        let byAgent = try await backend.events(actor: "agent:" + queued.id)
+        XCTAssertEqual(byAgent.map(\.action), ["ask", "close", "add"])
+        let health = try await backend.health()
+        XCTAssertEqual(health.tasks, 11)
+    }
+
+    func testMockRetransformAppliesTheInstruction() async throws {
+        await expect(.http(400, "instruction is required")) { try await self.backend.retransform("i9j0", instruction: " ") }
+        await expect(.refused("only a staged task can be retransformed")) { try await self.backend.retransform("a1b2", instruction: "x") }
+        await expect(.notFound("no such task")) { try await self.backend.retransform("zzzz", instruction: "x") }
+        let r = try await backend.retransform("i9j0", instruction: "Add that the landlord prefers mornings.")
+        XCTAssertEqual(r.run.kind, "retransform")
+        XCTAssertEqual(r.run.status, .done)
+        XCTAssertEqual(r.run.taskID, "i9j0")
+        XCTAssertEqual(r.run.costCents, 2)
+        XCTAssertEqual(r.say, "Added to the context: Add that the landlord prefers mornings.")
+        let t = try await backend.task("i9j0")
+        XCTAssertEqual(t.stage, .staged)
+        XCTAssertEqual(t.context, "Mid-November, four nights, near Alfama.\nAdd that the landlord prefers mornings.")
+        let events = try await backend.events(task: "i9j0")
+        XCTAssertEqual(events.map(\.action), ["retransform"])
+        XCTAssertEqual(events.first?.actor, "agent:" + r.run.id)
+        XCTAssertEqual(events.first?.before?.context, "Mid-November, four nights, near Alfama.")
+        let runs = try await backend.runs(task: "i9j0")
+        XCTAssertEqual(runs.map(\.id), [r.run.id])
+    }
+
+    func testMockSignedURLStaysNotBuilt() async {
         await expect(.notBuilt("/live/signed-url")) { try await self.backend.live() }
     }
 
-    func testMockNotBuiltRoutesByDefault() async {
-        await expect(.notBuilt("/runs")) { try await self.backend.runs() }
-        await expect(.notBuilt("/runs/r001")) { try await self.backend.run("r001") }
-        await expect(.notBuilt("/runs/r001/answer")) { try await self.backend.answer(run: "r001", "x") }
-        await expect(.notBuilt("/tasks/g7h8/commit")) { try await self.backend.commit("g7h8") }
-        await expect(.notBuilt("/tasks/g7h8/retransform")) { try await self.backend.retransform("g7h8", instruction: "x") }
-        await expect(.notBuilt("/live/signed-url")) { try await self.backend.live() }
+    // MARK: The key
+
+    func testAuthorizationHeaderFollowsTheKey() async throws {
+        _ = try await stub(200, "[]").tasks()
+        XCTAssertNil(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"))
+        var keyed = stub(200, "[]")
+        keyed.apiKey = "shh"
+        _ = try await keyed.tasks()
+        XCTAssertEqual(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer shh")
+        keyed = stub(200, #"{"id":"a1b2","stage":"closed","text":"x"}"#)
+        keyed.apiKey = "shh"
+        _ = try await keyed.close("a1b2")
+        XCTAssertEqual(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer shh")
+        XCTAssertEqual(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-Actor"), "agent:r1")
+        let e = await failure { try await self.stub(401, #"{"error":"this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>"}"#).tasks() }
+        XCTAssertEqual(e, .unauthorized("this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>"))
+        XCTAssertEqual(e?.errorDescription, "This backend needs its key. Set it in Settings.")
+    }
+
+    func testMockRequiresTheKeyWhenSet() async throws {
+        MockBackend.requiredKey = "shh"
+        let h = try await backend.health()                           // /health is open
+        XCTAssertEqual(h.tasks, 10)
+        let e = await failure { try await self.backend.tasks() }
+        XCTAssertEqual(e, .unauthorized("this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>"))
+        var wrong = backend!
+        wrong.apiKey = "nope"
+        await expect(.unauthorized("this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>")) { try await wrong.add(text: "x") }
+        var right = backend!
+        right.apiKey = "shh"
+        let tasks = try await right.tasks()
+        XCTAssertEqual(tasks.count, 10)
+        _ = try await right.add(text: "With the key")
+        let health = try await right.health()
+        XCTAssertEqual(health.tasks, 11)
+        var req = URLRequest(url: MockBackend.baseURL.appending(path: "/tasks"))
+        req.setValue("shh", forHTTPHeaderField: "X-Api-Key")
+        XCTAssertEqual(MockBackend.shared.handle(req).status, 200)
+        MockBackend.requiredKey = ""
+        let open = try await backend.tasks()
+        XCTAssertEqual(open.count, 11)
+    }
+
+    func testConfiguredKeyPrefersDefaultsOverThePlist() {
+        let d = UserDefaults(suiteName: "BackendTests.\(UUID())")!
+        XCTAssertEqual(Backend.configuredKey(defaults: d), Backend.defaultKey)   // the build default (empty here)
+        d.set("", forKey: Backend.keyStorageKey)
+        XCTAssertEqual(Backend.configuredKey(defaults: d), Backend.defaultKey)
+        d.set("from-settings", forKey: Backend.keyStorageKey)
+        XCTAssertEqual(Backend.configuredKey(defaults: d), "from-settings")
+        XCTAssertEqual(Backend.keyStorageKey, "backendKey")                       // -backendKey on the command line lands here
+    }
+
+    @MainActor
+    func testBoardUseURLAndKey() async {
+        let board = quietBoard(Backend(baseURL: MockBackend.baseURL, actor: "live:c9", session: MockURLProtocol.session, apiKey: "old"))
+        board.use(url: URL(string: "http://10.0.0.9:8787")!)
+        XCTAssertEqual(board.backend.apiKey, "old")                 // no key given: the old one stays
+        board.use(url: MockBackend.baseURL, key: "shh")
+        XCTAssertEqual(board.backend.apiKey, "shh")
+        XCTAssertEqual(board.backend.actor, "live:c9")
+        board.use(url: MockBackend.baseURL, key: "")
+        XCTAssertEqual(board.backend.apiKey, "")
+        MockBackend.requiredKey = "shh"
+        await board.refresh()
+        XCTAssertEqual(board.error, .unauthorized("this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>"))
+        XCTAssertTrue(board.tasks.isEmpty)
+        XCTAssertNil(board.lastSync)
+        board.use(url: MockBackend.baseURL, key: "shh")
+        await board.refresh()
+        XCTAssertNil(board.error)
+        XCTAssertEqual(board.tasks.count, 10)
+        XCTAssertEqual(board.runs.count, 1)
+        board.stopPolling()
+    }
+
+    @MainActor
+    func testBoardPollsWhileATaskIsCommitted() async throws {
+        let board = quietBoard()
+        board.pollInterval = .milliseconds(100)
+        await board.refresh()
+        XCTAssertTrue(board.polling)                                 // m3n4 is committed in the fixture
+        let before = try XCTUnwrap(board.lastSync)
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertGreaterThan(try XCTUnwrap(board.lastSync), before)
+        try await board.answer(run: "r001", "Flow")                  // the only committed task closes
+        XCTAssertFalse(board.polling)
+        let settled = try XCTUnwrap(board.lastSync)
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(board.lastSync, settled)
+        board.use(url: MockBackend.baseURL)
+        XCTAssertFalse(board.polling)
     }
 
     func testMockEventsFilterAndUnknownRoutes() async throws {
@@ -553,9 +728,22 @@ final class BackendTests: XCTestCase {
 final class StubURLProtocol: URLProtocol {
     static let host = "stub.undercurrent.test"
     static let baseURL = URL(string: "http://\(host)")!
-    static var reply: (status: Int, body: Data, contentType: String?) = (200, Data(), "application/json")
-    static var lastRequest: URLRequest?
-    static var lastBody: Data?
+    private static let lock = NSLock()
+    private static var _reply: (status: Int, body: Data, contentType: String?) = (200, Data(), "application/json")
+    private static var _lastRequest: URLRequest?
+    private static var _lastBody: Data?
+    static var reply: (status: Int, body: Data, contentType: String?) {
+        get { lock.withLock { _reply } }
+        set { lock.withLock { _reply = newValue } }
+    }
+    static var lastRequest: URLRequest? {
+        get { lock.withLock { _lastRequest } }
+        set { lock.withLock { _lastRequest = newValue } }
+    }
+    static var lastBody: Data? {
+        get { lock.withLock { _lastBody } }
+        set { lock.withLock { _lastBody = newValue } }
+    }
 
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == host }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

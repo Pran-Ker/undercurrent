@@ -19,6 +19,12 @@ struct RunView: View {
                         HStack {
                             Eyebrow(text: run.kind)
                             Chip(text: run.statusLabel, tone: run.status == .needsYou ? .warn : (run.status == .done ? .good : .neutral), mono: true)
+                                .accessibilityIdentifier("run.status")
+                            Spacer()
+                            if run.costCents > 0 {
+                                Text("\(run.costCents)¢").font(Theme.mono(11)).foregroundStyle(Theme.muted)
+                                    .accessibilityIdentifier("run.cost")
+                            }
                         }
                         Text(task?.text ?? run.taskID).font(Theme.display(26)).foregroundStyle(Theme.inkDeep)
                     }
@@ -65,6 +71,7 @@ struct RunView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("NOTE").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
                                 Text(task.note).font(Theme.body(15)).foregroundStyle(Theme.ink)
+                                    .accessibilityIdentifier("run.note")
                             }
                         }
                     }
@@ -78,6 +85,7 @@ struct RunView: View {
                                 }
                             }
                         }
+                        .accessibilityIdentifier("run.yielded")
                     }
                     Color.clear.frame(height: 20)
                 }
@@ -104,8 +112,6 @@ struct RunView: View {
             try await board.answer(run: run.id, answer.trimmingCharacters(in: .whitespacesAndNewlines))
             answer = ""
             Haptics.success()
-        } catch let e as BackendError where e.isNotBuilt {
-            notice = "Answering isn't built on the backend yet."
         } catch {
             notice = error.localizedDescription
             Haptics.error()

@@ -217,22 +217,65 @@ final class ModelTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode(Health.self, from: Data(#"{"ok":true}"#.utf8)))
     }
 
-    // The run the backend really sends (backend/internal/store/runs.go): steps are objects with
-    // at/kind/cmd/exit/ms/output and no "text" key.
-    func testRunDecodesTheBackendsRealShape() throws {
+    // The run the backend really sends (API.md "Runs"): steps are {at, kind, cmd, exit, ms, output}
+    // objects, rendered one line each; cost_cents is the agent's spend.
+    func testRunDecodesTheContractExample() throws {
         let json = """
         {"id": "r1x9", "task_id": "k79l", "kind": "commit", "status": "needs_you", "question": "Which card should pay?",
-         "steps": [{"at": "2026-10-11T19:02:11Z", "kind": "agent", "cmd": "claude -p --output-format json", "exit": 0, "ms": 41200, "output": "looked it up"}],
-         "cost_cents": 0, "started_at": "2026-10-11T19:02:11Z"}
+         "answer": "", "steps": [{"at": "2026-10-11T19:02:11Z", "kind": "agent", "cmd": "claude -p --output-format json", "exit": 0, "ms": 41200, "output": "looked it up"}],
+         "result": "", "cost_cents": 0, "started_at": "2026-10-11T19:02:11Z", "ended_at": ""}
         """
         let r = try JSONDecoder().decode(Run.self, from: Data(json.utf8))
+        XCTAssertEqual(r.id, "r1x9")
+        XCTAssertEqual(r.taskID, "k79l")
+        XCTAssertEqual(r.kind, "commit")
         XCTAssertEqual(r.status, .needsYou)
         XCTAssertEqual(r.question, "Which card should pay?")
-        XCTAssertEqual(r.steps.count, 1)
+        XCTAssertEqual(r.costCents, 0)
         XCTAssertEqual(r.startedAt, "2026-10-11T19:02:11Z")
-        let step = try XCTUnwrap(r.steps.first)
-        XCTExpectFailure("BoardTask.swift Run.init(from:): a step object without a text/step key falls through to a dictionary dump") {
-            XCTAssertFalse(step.hasPrefix("["), "the Run screen would show a Swift dictionary: \(step)")
-        }
+        XCTAssertEqual(r.endedAt, "")
+        XCTAssertEqual(r.steps, ["agent · claude -p --output-format json · 41s · looked it up"])
+    }
+
+    func testRunStepObjectsRenderEveryKind() throws {
+        let json = """
+        {"id": "r2", "task_id": "t", "kind": "commit", "status": "done", "cost_cents": 37,
+         "steps": [
+           {"at": "x", "kind": "agent", "cmd": "claude -p", "exit": 1, "ms": 900, "output": "  boom  "},
+           {"at": "x", "kind": "retry", "cmd": "claude -p", "exit": 0, "ms": 61000, "output": "fine"},
+           {"at": "x", "kind": "answer", "exit": 0, "ms": 0, "note": "Flow"},
+           {"at": "x", "kind": "call", "cmd": "c_123", "exit": 0, "ms": 95000, "note": "to +1555 · completed · 95s", "output": "hello"}
+         ]}
+        """
+        let r = try JSONDecoder().decode(Run.self, from: Data(json.utf8))
+        XCTAssertEqual(r.costCents, 37)
+        XCTAssertEqual(r.steps, [
+            "agent · claude -p · 1s · exit 1 · boom",
+            "retry · claude -p · 61s · fine",
+            "answer · Flow",
+            "call · c_123 · 95s · to +1555 · completed · 95s · hello",
+        ])
+        let long = try JSONDecoder().decode(Run.self, from: Data(#"{"id":"r3","steps":[{"kind":"agent","output":"\#(String(repeating: "x", count: 400))"}]}"#.utf8))
+        XCTAssertEqual(long.steps.first?.count, "agent · ".count + 160)
+    }
+
+    func testRetransformDecodesRunAndSay() throws {
+        let json = #"{"run":{"id":"r2y8","task_id":"k79l","kind":"retransform","status":"done","steps":[],"cost_cents":3},"say":"Split into three."}"#
+        let r = try JSONDecoder().decode(Retransform.self, from: Data(json.utf8))
+        XCTAssertEqual(r.say, "Split into three.")
+        XCTAssertEqual(r.run.id, "r2y8")
+        XCTAssertEqual(r.run.kind, "retransform")
+        XCTAssertEqual(r.run.status, .done)
+        XCTAssertEqual(r.run.costCents, 3)
+        let silent = try JSONDecoder().decode(Retransform.self, from: Data(#"{"run":{"id":"r1"},"say":null}"#.utf8))
+        XCTAssertEqual(silent.say, "")
+        XCTAssertThrowsError(try JSONDecoder().decode(Retransform.self, from: Data(#"{"say":"no run"}"#.utf8)))
+    }
+
+    func testRunCostCentsDecodesMissingAndNull() throws {
+        XCTAssertEqual(try JSONDecoder().decode(Run.self, from: Data(#"{"id":"r1","cost_cents":12}"#.utf8)).costCents, 12)
+        XCTAssertEqual(try JSONDecoder().decode(Run.self, from: Data(#"{"id":"r1","cost_cents":null}"#.utf8)).costCents, 0)
+        XCTAssertEqual(try JSONDecoder().decode(Run.self, from: Data(#"{"id":"r1"}"#.utf8)).costCents, 0)
+        XCTAssertEqual(Run(id: "r", taskID: "t", kind: "commit", status: .done, costCents: 9).costCents, 9)
     }
 }

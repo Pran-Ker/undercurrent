@@ -24,7 +24,7 @@ xcodegen generate >/dev/null
 echo "→ Building Release for device…"
 xcodebuild build -project Undercurrent.xcodeproj -scheme Undercurrent -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath "$OUT" -quiet \
-  PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" BACKEND_URL="$BACKEND_URL" CODE_SIGNING_ALLOWED=NO
+  PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" BACKEND_URL="$BACKEND_URL" BACKEND_KEY="${BACKEND_KEY:-}" CODE_SIGNING_ALLOWED=NO
 
 echo "→ Signing (click 'Always Allow' if the keychain asks)…"
 cat > /tmp/undercurrent-ent.plist <<PLIST

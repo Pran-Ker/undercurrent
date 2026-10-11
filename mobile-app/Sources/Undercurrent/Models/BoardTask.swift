@@ -136,8 +136,7 @@ struct Event: Codable, Identifiable, Equatable {
     }
 }
 
-// A run: an agent working a committed task, or retransforming a staged one (API.md, not built
-// yet on the backend; the app is written against the contract).
+// A run: an agent working a committed task, or retransforming a staged one (API.md "Runs").
 struct Run: Codable, Identifiable, Equatable {
     enum Status: String, Codable { case queued, running, needsYou = "needs_you", done, failed }
     var id: String
@@ -148,20 +147,23 @@ struct Run: Codable, Identifiable, Equatable {
     var answer: String = ""
     var steps: [String] = []
     var result: String = ""
+    var costCents: Int = 0
     var startedAt: String = ""
     var endedAt: String = ""
 
     enum CodingKeys: String, CodingKey {
         case id, kind, status, question, answer, steps, result
+        case costCents = "cost_cents"
         case taskID = "task_id"
         case startedAt = "started_at"
         case endedAt = "ended_at"
     }
 
     init(id: String, taskID: String, kind: String, status: Status, question: String = "", answer: String = "",
-         steps: [String] = [], result: String = "", startedAt: String = "", endedAt: String = "") {
+         steps: [String] = [], result: String = "", costCents: Int = 0, startedAt: String = "", endedAt: String = "") {
         self.id = id; self.taskID = taskID; self.kind = kind; self.status = status; self.question = question
-        self.answer = answer; self.steps = steps; self.result = result; self.startedAt = startedAt; self.endedAt = endedAt
+        self.answer = answer; self.steps = steps; self.result = result; self.costCents = costCents
+        self.startedAt = startedAt; self.endedAt = endedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -173,13 +175,27 @@ struct Run: Codable, Identifiable, Equatable {
         question = try c.decodeIfPresent(String.self, forKey: .question) ?? ""
         answer = try c.decodeIfPresent(String.self, forKey: .answer) ?? ""
         result = try c.decodeIfPresent(String.self, forKey: .result) ?? ""
+        costCents = try c.decodeIfPresent(Int.self, forKey: .costCents) ?? 0
         startedAt = try c.decodeIfPresent(String.self, forKey: .startedAt) ?? ""
         endedAt = try c.decodeIfPresent(String.self, forKey: .endedAt) ?? ""
         // Steps may arrive as strings, as objects with a "text", or as a JSON string.
         if let s = try? c.decodeIfPresent([String].self, forKey: .steps) {
             steps = s
         } else if let objs = try? c.decodeIfPresent([[String: AnyCodable]].self, forKey: .steps) {
-            steps = objs.map { $0["text"]?.string ?? $0["step"]?.string ?? $0.description }
+            // API.md: {at, kind, cmd, exit, ms, output, note} — one readable line each.
+            steps = objs.map { o in
+                if let t = o["text"]?.string ?? o["step"]?.string { return t }
+                var parts: [String] = []
+                if let k = o["kind"]?.string { parts.append(k) }
+                if let cmd = o["cmd"]?.string, !cmd.isEmpty { parts.append(cmd) }
+                if let ms = o["ms"]?.value as? Int, ms > 0 { parts.append("\(max(ms / 1000, 1))s") }
+                if let exit = o["exit"]?.value as? Int, exit != 0 { parts.append("exit \(exit)") }
+                if let note = o["note"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty { parts.append(note) }
+                if let out = o["output"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !out.isEmpty {
+                    parts.append(String(out.prefix(160)))
+                }
+                return parts.isEmpty ? o.description : parts.joined(separator: " · ")
+            }
         } else if let raw = try? c.decodeIfPresent(String.self, forKey: .steps),
                   let data = raw.data(using: .utf8),
                   let s = try? JSONDecoder().decode([String].self, from: data) {

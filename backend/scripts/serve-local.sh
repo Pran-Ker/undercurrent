@@ -3,6 +3,7 @@
 # without touching the shared board. PORT defaults to 8788 so it can sit next to the real one.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export UNDERCURRENT_DOTENV=0   # never read ../.env: that is the shared board
 export UNDERCURRENT_DB="${UNDERCURRENT_DB:-file:/tmp/undercurrent-local.db}"
 export PORT="${PORT:-8788}"
 unset TURSO_DATABASE_URL TURSO_AUTH_TOKEN

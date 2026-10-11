@@ -6,6 +6,13 @@ struct CallView: View {
     @Environment(Board.self) private var board
     @Environment(LiveSession.self) private var live
     @Environment(\.dismiss) private var dismiss
+    // -say "<text>" types that line to the agent once it has greeted (for driving a real call from
+    // the command line, where the Mac's microphone is not the person's).
+    @State private var lineToSay: String? = {
+        let a = ProcessInfo.processInfo.arguments
+        guard let i = a.firstIndex(of: "-say"), i + 1 < a.count else { return nil }
+        return a[i + 1]
+    }()
 
     var body: some View {
         VStack(spacing: 24) {
@@ -25,6 +32,10 @@ struct CallView: View {
             if let reason = live.reason {
                 Text(reason).font(Theme.small(14)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
                     .accessibilityIdentifier("call.reason")
+            }
+            if let tool = live.lastTool {
+                Text(tool).font(Theme.mono(11)).foregroundStyle(Theme.muted).multilineTextAlignment(.center).lineLimit(2)
+                    .accessibilityIdentifier("call.tool")
             }
             Spacer()
             if !live.transcript.isEmpty {
@@ -73,6 +84,7 @@ struct CallView: View {
         .background(Theme.canvas.ignoresSafeArea())
         .task {
             live.reset()
+            live.onToolCall = { Task { await board.refresh() } }
             await live.connect(using: board.backend)
         }
         .onDisappear {
@@ -81,7 +93,12 @@ struct CallView: View {
                 await board.refresh()
             }
         }
-        .onChange(of: live.transcript) { _, _ in Task { await board.refresh() } }
+        .onChange(of: live.status) { _, status in
+            // The agent has greeted and gone quiet: say the command-line line, once.
+            guard status == .listening, let line = lineToSay, live.transcript.contains(where: { $0.who == "agent" }) else { return }
+            lineToSay = nil
+            Task { await live.say(line) }
+        }
     }
 
     private var tone: Chip.Tone {

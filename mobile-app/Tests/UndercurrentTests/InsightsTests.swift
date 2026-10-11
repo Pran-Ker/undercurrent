@@ -123,9 +123,7 @@ final class InsightsTests: XCTestCase {
         let tasks = [task("x1", .closed, entry: "2026-10-01", done: "2026-10-11")]
         let i = Insights.compute(tasks: tasks, events: [], now: now, calendar: cal)
         XCTAssertEqual(metric(i, "Closed this week").value, 1)
-        XCTExpectFailure("Insights.swift: the current week's bucket ends at today's midnight, so a task closed today lands in no week") {
-            XCTAssertEqual(i.closedPerWeek.map(\.closed).reduce(0, +), 1)
-        }
+        XCTAssertEqual(i.closedPerWeek.map(\.closed).reduce(0, +), 1)
     }
 
     func testOverdueVersusDueToday() {

@@ -10,13 +10,13 @@ Built on the same XcodeGen + Fastlane + match pipeline as `~/Developer/mobile-de
 ## Layout
 
 ```
-project.yml                  the Xcode project (XcodeGen); BACKEND_URL is the build default
+project.yml                  the Xcode project (XcodeGen); BACKEND_URL and BACKEND_KEY are the build defaults
 Sources/Undercurrent/
   UndercurrentApp.swift      entry; refreshes the board whenever the app comes to the front
   Design/                    Theme (tokens) and Components (the qoves-style pieces)
   Models/                    BoardTask, Event, Run (API.md as Swift); Insights (the stats engine)
   API/                       Backend (the HTTP client); MockBackend (in-process, for tests/previews)
-  Store/Board.swift          the board: fetched on focus and after every action
+  Store/Board.swift          the board: fetched on focus and after every action; polls while a task is committed
   Views/                     Home, TaskDetail (+StageSheet), Add, Closed, Retransform, Run, Call,
                              Insights, Settings
 Tests/UndercurrentTests      unit: decoding, insights, client + board against the mock
@@ -37,6 +37,26 @@ The backend: `../backend/scripts/serve.sh` (the shared Turso board, from `../.en
 `../backend/scripts/serve-local.sh` (a throwaway file database with the demo set, on :8788 (the shared one is on :8790, set in ../.env)).
 The app's Settings screen can point at either.
 
+## The key
+
+A backend started with `UNDERCURRENT_API_KEY` (always, on a public URL) answers 401 to everything but
+`GET /health` unless the request carries `Authorization: Bearer <key>` (`MOBILE_APP.md`, "Reaching the
+backend"). The app sends the key on every request. Where it comes from, in order:
+
+1. The **Key** field in Settings (stored as `backendKey` in UserDefaults; `-backendKey <key>` on the
+   command line lands in the same place, like `-backendURL`).
+2. The build default `BACKEND_KEY` (`project.yml` → `BackendKey` in Info.plist), empty in the repo;
+   `deploy_phone.sh` passes it from `scripts/.env.local`.
+
+**Check** in Settings hits `/health` and then `/tasks`, so a wrong key shows the backend's 401 message
+before you use it. Home shows "This backend needs its key. Set it in Settings." when a keyed backend
+refuses the board. To try it on the simulator:
+
+```sh
+cd ../backend && UNDERCURRENT_API_KEY=testkey PORT=8831 UNDERCURRENT_DB=file:/tmp/uc-auth.db ./scripts/serve-local.sh
+xcrun simctl launch <udid> com.hebbarpran.undercurrent -backendURL http://127.0.0.1:8831 -backendKey testkey
+```
+
 ## On the phone, today
 
 ```sh
@@ -55,19 +75,24 @@ same Wi-Fi). The app's Settings screen can change it later.
 
 ## Voice
 
-The Call screen is a real ElevenLabs conversation (their Swift SDK over WebRTC). The app asks the
-backend for a conversation token (`GET /live/signed-url`), so no key ships in the app; the agent's
-tools call the backend back through a tunnel. Setting up or re-pointing the agent, from `../backend`:
+The Call screen is a real ElevenLabs conversation (their Swift SDK over WebRTC). Before a call the
+app asks the backend for `GET /live/config` (the agent, the tool secret, the tool names, the board
+as text) and `GET /live/signed-url` (the conversation token), so no ElevenLabs key ships in the app.
+The agent's tools are **client tools**: ElevenLabs hands each call to the phone, `LiveSession`
+forwards it to `POST /live/tools/<name>` with the secret, returns the result for the agent to speak,
+and refreshes the board. Key actions come back as a read-back first; the card shows it with Yes / No.
+When the call ends the transcript goes to `POST /live/post-call`. The backend needs no public URL.
+
+Setting up or re-pointing the agent, from `../backend` (the ids live in the database's meta table):
 
 ```sh
-cloudflared tunnel --url http://127.0.0.1:8790     # put the https URL in ../.env as PUBLIC_URL
-go run ./cmd/undercurrent elevenlabs sync          # creates/updates the tools and the agent (ids in the meta table)
+go run ./cmd/undercurrent elevenlabs sync          # creates/updates the ten client tools and the agent
 ../backend/scripts/serve.sh                        # restart so the backend reads the new .env
 ```
 
-A quick tunnel's URL changes every time it restarts; run `elevenlabs sync` again after that.
-Launching the app with `-call` opens the Call screen at once (handy on the simulator:
-`xcrun simctl launch <udid> com.hebbarpran.undercurrent -backendURL http://127.0.0.1:8790 -call`).
+Launching with `-call` opens the Call screen at once; `-say "<text>"` types one line to the agent
+once it has greeted (handy on the simulator, where the microphone is the Mac's):
+`xcrun simctl launch <udid> com.hebbarpran.undercurrent -backendURL http://127.0.0.1:8790 -call`.
 
 ## TestFlight, later
 
@@ -79,6 +104,12 @@ App Store Connect, `bundle exec fastlane setup_signing`.
 ## Testing
 
 UI tests never touch a real database: `-mockBackend` installs a `URLProtocol` that serves API.md
-from memory (`API/MockBackend.swift`), with a fixture of ten tasks and one run. Unit tests cover
-the models, the Insights engine, the client's error mapping (404 → notFound, 409 → refused,
-501 → notBuilt), and the Board's refresh-after-every-action rule.
+from memory (`API/MockBackend.swift`), with a fixture of ten tasks and one run that needs you. The
+mock's agent moves one step each time the runs are read, the way the real one moves between two
+polls: commit queues a run that asks a question on the next `GET /runs`; an answer resumes it and
+on the next read it closes the task with a note and yields the next step unstaged with `parent_id`;
+retransform answers `{run, say}` and appends the instruction to the context. `MockBackend.requiredKey`
+makes it answer 401 like a keyed backend. Only `GET /live/signed-url` is still 501 in the mock.
+Unit tests cover the models (including the run's step objects and `cost_cents`), the Insights
+engine, the client's error mapping (401 → unauthorized, 404 → notFound, 409 → refused,
+501 → notBuilt), the key header, the Board's refresh-after-every-action rule and its polling.

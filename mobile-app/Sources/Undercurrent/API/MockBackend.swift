@@ -11,7 +11,8 @@ final class MockBackend: @unchecked Sendable {
     private(set) var events: [Event] = []
     private var runs: [Run] = []
     private var nextEvent = 1
-    var notBuilt: Set<String> = ["commit", "retransform", "runs", "answer", "signed-url"]
+    // The key this mock was "started with" (UNDERCURRENT_API_KEY); empty means open, like a local backend.
+    static var requiredKey = ""
 
     static var isEnabled: Bool { ProcessInfo.processInfo.arguments.contains("-mockBackend") }
     static let baseURL = URL(string: "http://mock.undercurrent.test")!
@@ -38,17 +39,67 @@ final class MockBackend: @unchecked Sendable {
         ]
         runs = [Run(id: "r001", taskID: "m3n4", kind: "commit", status: .needsYou,
                     question: "Two plumbers can come Tuesday 9am: Ace (£80) or Flow (£65, 4.8★). Which one?",
-                    steps: ["Searched plumbers within 3 miles", "Checked Tuesday morning availability", "Compared quotes"])]
+                    steps: ["Searched plumbers within 3 miles", "Checked Tuesday morning availability", "Compared quotes"],
+                    costCents: 4, startedAt: Dates.timestampFormatter.string(from: .now))]
         events = []
         nextEvent = 1
         record("add", before: nil, after: tasks[0], actor: "user")
         record("stage", before: BoardTask(id: "g7h8", stage: .unstaged, text: "File the Q3 taxes"), after: tasks[3], actor: "user")
     }
 
-    private func record(_ action: String, before: BoardTask?, after: BoardTask?, actor: String, note: String = "") {
+    private func record(_ action: String, before: BoardTask?, after: BoardTask?, actor: String, runID: String = "", note: String = "") {
         events.append(Event(id: nextEvent, at: Dates.timestampFormatter.string(from: .now), actor: actor, action: action,
-                            taskID: after?.id ?? before?.id ?? "", before: before, after: after, note: note))
+                            taskID: after?.id ?? before?.id ?? "", runID: runID, before: before, after: after, note: note))
         nextEvent += 1
+    }
+
+    // MARK: The simulated agent. It moves one step every time the runs are read, the way the real
+    // one moves between two polls: queued → needs_you with a question; answered → done, the task
+    // closed with a note and the next step landed unstaged with parent_id.
+
+    private func advance() {
+        for i in runs.indices {
+            let run = runs[i]
+            guard let t = tasks.firstIndex(where: { $0.id == run.taskID }) else { continue }
+            let actor = "agent:" + run.id
+            switch run.status {
+            case .queued:
+                runs[i].status = .needsYou
+                runs[i].question = "Before I go on with “\(tasks[t].text)”: should I favour the cheapest option or the fastest?"
+                runs[i].steps.append("Read the task and its context")
+                runs[i].costCents += 3
+                record("ask", before: tasks[t], after: tasks[t], actor: actor, runID: run.id, note: runs[i].question)
+            case .running:
+                let before = tasks[t]
+                let note = "Done. Went with your answer: “\(run.answer)”."
+                tasks[t].stage = .closed
+                tasks[t].done = Dates.dayString(.now)
+                tasks[t].note = tasks[t].note.isEmpty ? note : tasks[t].note + "\n" + note
+                tasks[t].updatedAt = Dates.timestampFormatter.string(from: .now)
+                record("close", before: before, after: tasks[t], actor: actor, runID: run.id, note: note)
+                let child = BoardTask(id: newID(), stage: .unstaged, text: "Follow up on: \(before.text)", tags: before.tags,
+                                      parentID: before.id, createdBy: "agent", entry: Dates.dayString(.now),
+                                      updatedAt: Dates.timestampFormatter.string(from: .now))
+                tasks.append(child)
+                record("add", before: nil, after: child, actor: actor, runID: run.id, note: "the next step")
+                runs[i].status = .done
+                runs[i].result = note
+                runs[i].steps.append("Finished with the answer")
+                runs[i].costCents += 5
+                runs[i].endedAt = Dates.timestampFormatter.string(from: .now)
+            default: break
+            }
+        }
+    }
+
+    // A run as the backend sends it: steps are {at, kind, cmd, exit, ms, output} objects.
+    private func wire(_ r: Run) -> [String: Any] {
+        ["id": r.id, "task_id": r.taskID, "kind": r.kind, "status": r.status.rawValue,
+         "question": r.question, "answer": r.answer, "result": r.result, "cost_cents": r.costCents,
+         "started_at": r.startedAt, "ended_at": r.endedAt,
+         "steps": r.steps.enumerated().map { i, s in
+             ["at": r.startedAt, "kind": "agent", "cmd": "claude -p --output-format json", "exit": 0, "ms": 1200 * (i + 1), "output": s] as [String: Any]
+         }]
     }
 
     // MARK: Routing
@@ -76,6 +127,13 @@ final class MockBackend: @unchecked Sendable {
 
         if at("GET", "health") != nil {
             return json(["ok": true, "tasks": tasks.count])
+        }
+        if !Self.requiredKey.isEmpty {
+            let bearer = req.value(forHTTPHeaderField: "Authorization") ?? ""
+            let given = bearer.hasPrefix("Bearer ") ? String(bearer.dropFirst(7)) : (req.value(forHTTPHeaderField: "X-Api-Key") ?? "")
+            if given != Self.requiredKey {
+                return error(401, "this backend needs its key: Authorization: Bearer <UNDERCURRENT_API_KEY>")
+            }
         }
         if at("GET", "tasks") != nil {
             let stage = query.first { $0.name == "stage" }?.value
@@ -136,39 +194,74 @@ final class MockBackend: @unchecked Sendable {
             return encode(tasks[i])
         }
         if let c = at("POST", "tasks", "*", "commit") {
-            if notBuilt.contains("commit") { return error(501, "not built yet") }
             guard let i = tasks.firstIndex(where: { $0.id == c[0] }) else { return error(404, "no such task") }
             guard tasks[i].stage == .staged else { return error(409, "only a staged task can be committed") }
             let before = tasks[i]
             tasks[i].stage = .committed
-            runs.append(Run(id: newID(), taskID: c[0], kind: "commit", status: .queued))
-            record("commit", before: before, after: tasks[i], actor: actor)
-            return encode(tasks[i])
+            tasks[i].updatedAt = Dates.timestampFormatter.string(from: .now)
+            let run = Run(id: newID(), taskID: c[0], kind: "commit", status: .queued, startedAt: Dates.timestampFormatter.string(from: .now))
+            runs.append(run)
+            record("commit", before: before, after: tasks[i], actor: actor, runID: run.id)
+            return json(wire(run), status: 202)
         }
-        if at("POST", "tasks", "*", "retransform") != nil {
-            return error(501, "not built yet")
+        if let c = at("POST", "tasks", "*", "retransform") {
+            guard let instruction = (body["instruction"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !instruction.isEmpty else {
+                return error(400, "instruction is required")
+            }
+            guard let i = tasks.firstIndex(where: { $0.id == c[0] }) else { return error(404, "no such task") }
+            guard tasks[i].stage == .staged else { return error(409, "only a staged task can be retransformed") }
+            let now = Dates.timestampFormatter.string(from: .now)
+            let say = "Added to the context: \(instruction)"
+            let run = Run(id: newID(), taskID: c[0], kind: "retransform", status: .done,
+                          steps: ["Read the instruction", "Enriched the context"], result: say, costCents: 2, startedAt: now, endedAt: now)
+            runs.append(run)
+            let before = tasks[i]
+            tasks[i].context = before.context.isEmpty ? instruction : before.context + "\n" + instruction
+            tasks[i].updatedAt = now
+            record("retransform", before: before, after: tasks[i], actor: "agent:" + run.id, runID: run.id, note: instruction)
+            return json(["run": wire(run), "say": say])
         }
         if at("GET", "runs") != nil {
-            if notBuilt.contains("runs") { return error(501, "not built yet") }
+            advance()
             let task = query.first { $0.name == "task" }?.value
-            return encode(runs.filter { task == nil || $0.taskID == task })
+            return json(runs.reversed().filter { task == nil || $0.taskID == task }.map(wire))
         }
         if let c = at("GET", "runs", "*") {
-            if notBuilt.contains("runs") { return error(501, "not built yet") }
             guard let r = runs.first(where: { $0.id == c[0] }) else { return error(404, "no such run") }
-            return encode(r)
+            return json(wire(r))
         }
         if let c = at("POST", "runs", "*", "answer") {
-            if notBuilt.contains("answer") { return error(501, "not built yet") }
+            guard let answer = (body["answer"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !answer.isEmpty else {
+                return error(400, "answer is required")
+            }
             guard let i = runs.firstIndex(where: { $0.id == c[0] }) else { return error(404, "no such run") }
-            runs[i].answer = body["answer"] as? String ?? ""
+            guard runs[i].status == .needsYou else { return error(409, "this run is not waiting for an answer") }
+            runs[i].answer = answer
             runs[i].status = .running
-            return encode(runs[i])
+            runs[i].steps.append("You answered: \(answer)")
+            if let t = tasks.first(where: { $0.id == runs[i].taskID }) {
+                record("answer", before: t, after: t, actor: actor, runID: runs[i].id, note: answer)
+            }
+            return json(wire(runs[i]), status: 202)
         }
         if at("GET", "events") != nil {
             let task = query.first { $0.name == "task" }?.value
             let actorQ = query.first { $0.name == "actor" }?.value
-            return encode(events.filter { (task == nil || $0.taskID == task) && (actorQ == nil || $0.actor == actorQ) })
+            var out = events.filter { (task == nil || $0.taskID == task) && (actorQ == nil || $0.actor == actorQ) }
+            if let n = Int(query.first { $0.name == "limit" }?.value ?? ""), n > 0, out.count > n { out = Array(out.suffix(n)) }
+            return encode(out)
+        }
+        if at("GET", "state") != nil {
+            guard let atQ = query.first(where: { $0.name == "at" })?.value, !atQ.isEmpty else { return error(400, "at is required") }
+            struct State: Encodable { var at: String; var tasks: [BoardTask] }
+            var latest: [String: BoardTask] = [:]
+            var order: [String] = []
+            for e in events where e.at <= atQ {
+                guard let t = e.after else { continue }
+                if latest[t.id] == nil { order.append(t.id) }
+                latest[t.id] = t
+            }
+            return encode(State(at: atQ, tasks: order.compactMap { latest[$0] }))
         }
         if at("GET", "live", "signed-url") != nil {
             return error(501, "not built yet")
@@ -195,14 +288,14 @@ final class MockBackend: @unchecked Sendable {
         let alphabet = Array("0123456789abcdefghijklmnopqrstuvwxyz")
         while true {
             let id = String((0..<4).map { _ in alphabet.randomElement()! })
-            if id.contains(where: \.isNumber), !tasks.contains(where: { $0.id == id }) { return id }
+            if id.contains(where: \.isNumber), !tasks.contains(where: { $0.id == id }), !runs.contains(where: { $0.id == id }) { return id }
         }
     }
 
     private func encode<T: Encodable>(_ v: T, status: Int = 200) -> Reply {
         Reply(status: status, body: (try? JSONEncoder().encode(v)) ?? Data("null".utf8))
     }
-    private func json(_ v: [String: Any], status: Int = 200) -> Reply {
+    private func json(_ v: Any, status: Int = 200) -> Reply {
         Reply(status: status, body: (try? JSONSerialization.data(withJSONObject: v)) ?? Data())
     }
     private func error(_ status: Int, _ message: String) -> Reply { json(["error": message], status: status) }

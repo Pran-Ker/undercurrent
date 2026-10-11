@@ -131,13 +131,18 @@ struct TaskDetailView: View {
                 HStack {
                     Text("RUN").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
                     Spacer()
-                    if let run { Chip(text: run.statusLabel, tone: run.status == .needsYou ? .warn : .neutral, mono: true) }
+                    if let run {
+                        Chip(text: run.statusLabel, tone: run.status == .needsYou ? .warn : .neutral, mono: true)
+                            .accessibilityIdentifier("task.run.status")
+                    }
                 }
                 if let run {
                     if run.status == .needsYou, !run.question.isEmpty {
                         Text(run.question).font(Theme.body(15)).foregroundStyle(Theme.ink)
+                            .accessibilityIdentifier("task.run.question")
                     }
-                    Button("Open the run") { path.append(Route.run(run.id)) }.buttonStyle(.pill(.secondary))
+                    Button("Open the run") { path.append(Route.run(run.id)) }
+                        .buttonStyle(.pill(.secondary)).accessibilityIdentifier("task.run.open")
                 } else {
                     Text(board.runsAvailable ? "The agent has it. No run recorded yet." : "The backend hasn't built runs yet; this task is committed.")
                         .font(Theme.body(15)).foregroundStyle(Theme.muted)
@@ -277,8 +282,6 @@ struct TaskDetailView: View {
         do {
             try await board.commit(task.id)
             Haptics.success()
-        } catch let e as BackendError where e.isNotBuilt {
-            notice = "Commit isn't built on the backend yet. The task stays staged."
         } catch {
             notice = error.localizedDescription
             Haptics.error()

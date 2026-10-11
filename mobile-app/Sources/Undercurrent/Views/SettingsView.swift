@@ -1,10 +1,13 @@
 import SwiftUI
 
-// Settings: where the backend is. Checked live; the board refetches when it changes.
+// Settings: where the backend is and the key it was started with. Checked live; the board
+// refetches when it changes.
 struct SettingsView: View {
     @Environment(Board.self) private var board
     @AppStorage(Backend.storageKey) private var backendURL = ""
+    @AppStorage(Backend.keyStorageKey) private var backendKey = ""
     @State private var draft = ""
+    @State private var keyDraft = ""
     @State private var checking = false
     @State private var result: String?
     @State private var resultOK = false
@@ -22,6 +25,13 @@ struct SettingsView: View {
                             .keyboardType(.URL).autocorrectionDisabled().textInputAutocapitalization(.never)
                             .accessibilityIdentifier("settings.url")
                         Text("The Go backend on your Mac, or a tunnel to it. Leave empty for the build default.")
+                            .font(Theme.small(13)).foregroundStyle(Theme.muted)
+                        Text("KEY").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted).padding(.top, 4)
+                        SecureField(Backend.defaultKey.isEmpty ? "none" : "the build default", text: $keyDraft)
+                            .font(Theme.mono(14)).foregroundStyle(Theme.ink)
+                            .autocorrectionDisabled().textInputAutocapitalization(.never)
+                            .accessibilityIdentifier("settings.key")
+                        Text("The UNDERCURRENT_API_KEY that backend was started with. Leave empty for an open local backend or the build default.")
                             .font(Theme.small(13)).foregroundStyle(Theme.muted)
                         HStack(spacing: 10) {
                             Button { Task { await check() } } label: { Text(checking ? "Checking…" : "Check") }
@@ -44,6 +54,7 @@ struct SettingsView: View {
                         Text("THIS INSTALL").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
                         row("Actor", board.backend.actor)
                         row("Using", board.backend.baseURL.absoluteString)
+                        row("Key", board.backend.apiKey.isEmpty ? "none" : "set")
                         row("Last sync", board.lastSync.map { Self.time($0) } ?? "never")
                         row("Version", Self.version)
                     }
@@ -64,7 +75,7 @@ struct SettingsView: View {
         .background(Theme.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.canvas, for: .navigationBar)
-        .onAppear { draft = backendURL }
+        .onAppear { draft = backendURL; keyDraft = backendKey }
     }
 
     private func row(_ label: String, _ value: String) -> some View {
@@ -81,13 +92,24 @@ struct SettingsView: View {
         return u
     }
 
+    private var candidateKey: String {
+        let k = keyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return k.isEmpty ? Backend.defaultKey : k
+    }
+
+    // /health is open; /tasks proves the key.
     private func check() async {
         guard let url = candidate else { result = "That isn't a URL."; resultOK = false; return }
         checking = true; defer { checking = false }
+        let b = Backend(baseURL: url, session: board.backend.session, apiKey: candidateKey)
         do {
-            let h = try await Backend(baseURL: url, session: board.backend.session).health()
+            let h = try await b.health()
+            _ = try await b.tasks()
             result = h.ok ? "Reachable. \(h.tasks) tasks on the board." : "Replied, but not ok."
             resultOK = h.ok
+        } catch BackendError.unauthorized(let m) {
+            result = "Key refused (401): " + (m.isEmpty ? "this backend needs its key." : m)
+            resultOK = false
         } catch {
             result = error.localizedDescription
             resultOK = false
@@ -96,12 +118,12 @@ struct SettingsView: View {
 
     private func save() {
         guard let url = candidate else { result = "That isn't a URL."; resultOK = false; return }
-        let s = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        backendURL = s
-        if !MockBackend.isEnabled { board.use(url: url) }
+        backendURL = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        backendKey = keyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !MockBackend.isEnabled { board.use(url: url, key: candidateKey) }
         Task { await board.refresh() }
         Haptics.tap()
-        result = "Using \(url.absoluteString)"
+        result = "Using \(url.absoluteString)" + (candidateKey.isEmpty ? "" : " with a key")
         resultOK = true
     }
 

@@ -24,6 +24,8 @@
     <string>AppIcon</string>
     <key>BackendURL</key>
     <string>$(BACKEND_URL)</string>
+    <key>BackendKey</key>
+    <string>$(BACKEND_KEY)</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>ITSAppUsesNonExemptEncryption</key>

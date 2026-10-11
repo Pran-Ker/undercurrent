@@ -19,6 +19,9 @@ settings:
     # Where the app finds the backend by default (the simulator, on this machine). A device build
     # passes BACKEND_URL=http://<your mac>.local:8790 on the command line; Settings overrides it on the phone.
     BACKEND_URL: "http://127.0.0.1:8790"
+    # The key that backend was started with (UNDERCURRENT_API_KEY); empty for an open local one.
+    # A device build passes BACKEND_KEY=… on the command line; Settings overrides it on the phone.
+    BACKEND_KEY: ""
 
 targets:
   Undercurrent:

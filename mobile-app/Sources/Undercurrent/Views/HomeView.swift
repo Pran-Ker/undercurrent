@@ -45,6 +45,11 @@ struct HomeView: View {
                     .accessibilityAddTraits(.isHeader)
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button { path.append(Route.time) } label: {
+                    Image(systemName: "clock.arrow.circlepath").font(.system(size: 15, weight: .regular))
+                }
+                .accessibilityLabel("Time travel")
+                .accessibilityIdentifier("nav.time")
                 Button { path.append(Route.insights) } label: {
                     Image(systemName: "chart.xyaxis.line").font(.system(size: 15, weight: .regular))
                 }

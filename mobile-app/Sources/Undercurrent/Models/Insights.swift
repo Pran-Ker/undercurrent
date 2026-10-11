@@ -142,10 +142,12 @@ struct Insights: Equatable {
             series.append(Point(day: day, open: openThen, closed: closedBy))
         }
 
+        // Eight weeks ending tomorrow at midnight, so today's closes land in the last bucket.
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
         var weekly: [Point] = []
         for w in stride(from: 7, through: 0, by: -1) {
-            let start = calendar.date(byAdding: .day, value: -7 * w, to: weekAgo)!
-            let end = calendar.date(byAdding: .day, value: 7, to: start)!
+            let end = calendar.date(byAdding: .day, value: -7 * w, to: tomorrow)!
+            let start = calendar.date(byAdding: .day, value: -7, to: end)!
             let n = closed.compactMap(\.doneDate).filter { $0 >= start && $0 < end }.count
             let o = tasks.filter { t in
                 guard let e = t.entryDate else { return false }

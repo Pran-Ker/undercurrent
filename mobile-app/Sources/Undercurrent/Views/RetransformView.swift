@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Retransform: describe the change in words; the result shows as the board changing.
+// Retransform: describe the change in words; the model says what it did and the board changes.
 struct RetransformView: View {
     @Environment(Board.self) private var board
     @Environment(\.dismiss) private var dismiss
@@ -8,7 +8,7 @@ struct RetransformView: View {
     @State private var instruction = ""
     @State private var busy = false
     @State private var notice: String?
-    @State private var notBuilt = false
+    @State private var say: String?
     @FocusState private var focused: Bool
 
     private let examples = [
@@ -32,34 +32,42 @@ struct RetransformView: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.radiusInset, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.radiusInset, style: .continuous).stroke(Theme.hairline, lineWidth: 1))
                     .focused($focused)
+                    .disabled(say != nil)
                     .accessibilityIdentifier("retransform.instruction")
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(examples.enumerated()), id: \.offset) { i, e in
-                        Button { instruction = e } label: {
-                            NumberedRow(index: i + 1) {
-                                Text(e).font(Theme.small(14)).foregroundStyle(Theme.muted).multilineTextAlignment(.leading)
-                            }
-                        }
-                        .buttonStyle(.pressable)
-                    }
-                }
-                if notBuilt {
+                if let say {
                     Card {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("NOT BUILT YET").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
-                            Text("The backend answers 501 for retransform today. The task stays as it is.")
-                                .font(Theme.body(15)).foregroundStyle(Theme.ink)
+                            Text("THE MODEL SAID").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
+                            Text(say).font(Theme.body(15)).foregroundStyle(Theme.ink)
+                                .accessibilityIdentifier("retransform.say")
+                            Text("The board has changed behind this sheet.").font(Theme.small(13)).foregroundStyle(Theme.muted)
                         }
                     }
-                    .accessibilityIdentifier("retransform.notbuilt")
-                } else if let notice {
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(Array(examples.enumerated()), id: \.offset) { i, e in
+                            Button { instruction = e } label: {
+                                NumberedRow(index: i + 1) {
+                                    Text(e).font(Theme.small(14)).foregroundStyle(Theme.muted).multilineTextAlignment(.leading)
+                                }
+                            }
+                            .buttonStyle(.pressable)
+                        }
+                    }
+                }
+                if let notice {
                     ErrorBanner(message: notice) { self.notice = nil }
                 }
                 Spacer()
-                Button { Task { await send() } } label: { Text(busy ? "Sending…" : "Retransform") }
-                    .buttonStyle(.pill)
-                    .disabled(busy || instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .accessibilityIdentifier("retransform.send")
+                if say != nil {
+                    Button { dismiss() } label: { Text("Done") }
+                        .buttonStyle(.pill).accessibilityIdentifier("retransform.done")
+                } else {
+                    Button { Task { await send() } } label: { Text(busy ? "Sending…" : "Retransform") }
+                        .buttonStyle(.pill)
+                        .disabled(busy || instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("retransform.send")
+                }
             }
             .padding(Theme.gutter)
             .background(Theme.canvas.ignoresSafeArea())
@@ -72,11 +80,10 @@ struct RetransformView: View {
     private func send() async {
         busy = true; defer { busy = false }
         do {
-            try await board.retransform(task.id, instruction: instruction.trimmingCharacters(in: .whitespacesAndNewlines))
+            let r = try await board.retransform(task.id, instruction: instruction.trimmingCharacters(in: .whitespacesAndNewlines))
+            say = r.say.isEmpty ? "Done. The run \(r.run.id) is \(r.run.statusLabel)." : r.say
+            focused = false
             Haptics.success()
-            dismiss()
-        } catch let e as BackendError where e.isNotBuilt {
-            notBuilt = true
         } catch {
             notice = error.localizedDescription
             Haptics.error()
