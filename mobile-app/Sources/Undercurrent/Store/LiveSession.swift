@@ -30,6 +30,11 @@ final class LiveSession {
     @ObservationIgnored private var backend: Backend?
     @ObservationIgnored private var config: LiveConfig?
     @ObservationIgnored private var inFlight: Set<String> = []
+
+    // Tools that change the board wait this long before they run: a beat to read the card, and
+    // room to say "no" before the agent's confirmed call lands. Reads run at once.
+    static var actionDelay: Duration = .seconds(2)
+    static let mutating: Set<String> = ["add_task", "stage_task", "move_task", "commit_task", "retransform", "edit_task", "close_task", "answer_agent"]
     @ObservationIgnored private var userLinesAtReadBack = 0
     @ObservationIgnored private var posted = false
 
@@ -144,8 +149,8 @@ final class LiveSession {
 
     private func apply(_ messages: [Message]) {
         transcript = messages.map { Line(id: $0.id, who: $0.role == .agent ? "agent" : "you", text: Self.stripTags($0.content)) }
-        // The read-back stays until the person answers (a new user line) or the agent's next tool call.
-        if readBack != nil, Self.userLines(transcript) > userLinesAtReadBack { readBack = nil }
+        // The read-back stays on screen until the person taps Yes / No or the agent's confirmed
+        // action lands; a transcribed word never takes it away.
     }
 
     // MARK: Tools
@@ -170,10 +175,15 @@ final class LiveSession {
         if let backend, let config, config.tools.contains(call.toolName) {
             var args = (try? call.getParameters()) ?? [:]
             if let id = conversationID ?? conv.conversationMetadata?.conversationId { args["conversation_id"] = id }
+            if Self.mutating.contains(call.toolName) { try? await Task.sleep(for: Self.actionDelay) }
             do {
                 let reply = try await backend.liveTool(call.toolName, args: args, secret: config.secret)
                 spoken = reply.spoken
-                show(readBack: reply.needsConfirmation ? reply.readBack : nil)
+                if reply.needsConfirmation {
+                    show(readBack: reply.readBack)
+                } else if Self.mutating.contains(call.toolName) {
+                    show(readBack: nil)
+                }
             } catch {
                 let what = (error as? BackendError)?.errorDescription ?? error.localizedDescription
                 spoken = "ERROR: the app couldn't reach the backend (\(what)); nothing changed"

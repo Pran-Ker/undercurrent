@@ -40,26 +40,33 @@ struct CallView: View {
             Spacer()
             if !live.transcript.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(live.transcript.suffix(4)) { line in
+                    ForEach(live.transcript.suffix(3)) { line in
                         HStack(alignment: .top, spacing: 10) {
                             Text(line.who.uppercased()).font(Theme.mono(9)).tracking(1).foregroundStyle(Theme.muted).frame(width: 44, alignment: .leading)
-                            Text(line.text).font(Theme.small(14)).foregroundStyle(Theme.ink)
+                            Text(line.text).font(Theme.small(14)).foregroundStyle(Theme.ink).lineLimit(2)
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let readBack = live.readBack {
-                Card {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("READ-BACK").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
-                        Text(readBack).font(Theme.body(16)).foregroundStyle(Theme.ink)
-                        HStack(spacing: 10) {
-                            Button("Yes") { Task { await live.answerReadBack(true) } }.buttonStyle(.pill).accessibilityIdentifier("call.yes")
-                            Button("No") { Task { await live.answerReadBack(false) } }.buttonStyle(.pill(.secondary)).accessibilityIdentifier("call.no")
-                        }
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("READ-BACK · SAY YES OR NO").font(Theme.mono(10)).tracking(1).foregroundStyle(Theme.muted)
+                    Text(readBack)
+                        .font(Theme.title(20)).foregroundStyle(Theme.inkDeep)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("call.readback")
+                    HStack(spacing: 10) {
+                        Button("Yes") { Task { await live.answerReadBack(true) } }.buttonStyle(.pill).accessibilityIdentifier("call.yes")
+                        Button("No") { Task { await live.answerReadBack(false) } }.buttonStyle(.pill(.secondary)).accessibilityIdentifier("call.no")
                     }
                 }
+                .padding(Theme.cardPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusCard, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radiusCard, style: .continuous).stroke(Theme.slateLight, lineWidth: 1))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             HStack(spacing: 10) {
                 if live.status == .listening || live.status == .speaking || live.status == .thinking {
@@ -82,6 +89,7 @@ struct CallView: View {
         .padding(Theme.gutter)
         .padding(.top, 8)
         .background(Theme.canvas.ignoresSafeArea())
+        .animation(Theme.spring, value: live.readBack)
         .task {
             live.reset()
             live.onToolCall = { Task { await board.refresh() } }
