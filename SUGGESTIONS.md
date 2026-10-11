@@ -99,6 +99,10 @@ and WhatsApp by request; five-minute calls, two at a time on new accounts.
   number; iMessage and WhatsApp are channels on an iMessage-type number (WhatsApp is a beta that
   support enables per account). A task that says *text* rather than *call* could go that way and
   wait for the reply as an event.
+- Not taken for now: the self-hosted runtime (Dial streams the call to a websocket we host and our
+  own model speaks) and Context MCP (Dial's voice agent calls our tools mid-call). Both need a public
+  endpoint and a second deployment; the managed agent with the task as its instruction covers the
+  demo. Revisit if a call must read or change the board while it is happening.
 
 ## Alike — alike.work
 

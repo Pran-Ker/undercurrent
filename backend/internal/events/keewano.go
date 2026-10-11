@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
+	"log"
 	"net/http"
 	"os"
 	"sort"
@@ -71,7 +72,11 @@ func (f *Forwarder) OnEvent(e store.Event) {
 	if name == "" {
 		return
 	}
-	go f.Send(name, value)
+	go func() {
+		if err := f.Send(name, value); err != nil {
+			log.Printf("keewano: %v", err)
+		}
+	}()
 }
 
 func classify(e store.Event) (string, any) {

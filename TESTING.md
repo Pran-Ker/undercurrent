@@ -199,7 +199,8 @@ sequenceDiagram
 
 ## I11 · a committed call task dials and leaves review notes — `TestI11CommittedCallTaskDialsAndLeavesReviewNotes`
 
-The task names a phone number, so the run is a call. Dial is a scripted counterpart here (a fake
+The task says call and names a phone number, so the run is a call; a number without a call verb goes
+to the agent as usual. Dial is a scripted counterpart here (a fake
 REST server keyed by the number); `TestDialLiveCall` places one real call when `DIAL_LIVE_TEST=1`
 and `DIAL_LIVE_TO` are set, and is skipped otherwise.
 
@@ -222,6 +223,8 @@ sequenceDiagram
   A->>P: place, poll
   P-->>A: no-answer
   A->>D: event call, task back to staged with "the call was not completed: no-answer", event hand_back, run failed, no review task
+  U->>A: POST /tasks/plumber/commit  ("text … +1415…77", no call verb)
+  A->>A: the agent command, as for any task
 ```
 
 ## Smaller tests

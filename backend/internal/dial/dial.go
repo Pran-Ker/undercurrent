@@ -52,10 +52,20 @@ func New() *Client {
 	return &Client{Key: key, From: os.Getenv("DIAL_FROM_NUMBER"), Base: base, Poll: 5 * time.Second, HTTP: &http.Client{Timeout: 30 * time.Second}}
 }
 
-var e164 = regexp.MustCompile(`\+[1-9][0-9]{7,14}`)
+var (
+	e164 = regexp.MustCompile(`\+[1-9][0-9]{7,14}`)
+	verb = regexp.MustCompile(`(?i)\b(call|phone|ring|dial)\b`)
+)
 
 // Number is the first phone number written in the text, E.164, or empty.
 func Number(text string) string { return e164.FindString(text) }
+
+// Wants says whether the text asks for a call: a call verb and a number to dial. A number alone
+// (a contact to text, a code to note) is not a call.
+func Wants(text string) (string, bool) {
+	to := Number(text)
+	return to, to != "" && verb.MatchString(text)
+}
 
 // Place starts an outbound call; the idempotency key keeps a retried placement from dialing twice.
 func (c *Client) Place(to, instruction, idempotencyKey string) (Call, error) {

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 type Runner struct {
 	S        *store.Store
 	AgentCmd []string      // AGENT_CMD: reads the prompt on stdin, prints its answer
+	Dir      string        // AGENT_DIR: where the agent runs — a scratch folder, so no project hooks, settings or files are in its way
 	Sync     bool          // tests: run in the request instead of a goroutine
 	Retries  int           // bounded retries on a failed invocation
 	Backoff  time.Duration // between retries
@@ -45,7 +47,12 @@ func New(s *store.Store) *Runner {
 	if cmd == "" {
 		cmd = "claude -p --output-format json"
 	}
-	return &Runner{S: s, AgentCmd: strings.Fields(cmd), Sync: os.Getenv("UNDERCURRENT_SYNC_RUNS") == "1", Retries: 3, Backoff: 2 * time.Second, Timeout: 15 * time.Minute, Chat: Chat, Dial: dial.New()}
+	dir := os.Getenv("AGENT_DIR")
+	if dir == "" {
+		dir = filepath.Join(os.TempDir(), "undercurrent-agent")
+	}
+	os.MkdirAll(dir, 0o755)
+	return &Runner{S: s, AgentCmd: strings.Fields(cmd), Dir: dir, Sync: os.Getenv("UNDERCURRENT_SYNC_RUNS") == "1", Retries: 3, Backoff: 2 * time.Second, Timeout: 15 * time.Minute, Chat: Chat, Dial: dial.New()}
 }
 
 // Commit hands a staged task to the agent: the task becomes committed, a run is queued and started.
@@ -98,7 +105,7 @@ func (r *Runner) execute(runID string) {
 	run.Status = "running"
 	r.S.PutRun(run)
 	actor := "agent:" + run.ID
-	if to := dial.Number(t.Text + " " + t.Context); to != "" && r.Dial != nil {
+	if to, ok := dial.Wants(t.Text + " " + t.Context); ok && r.Dial != nil {
 		r.call(run, t, actor, to)
 		return
 	}
@@ -265,6 +272,7 @@ func (r *Runner) once(prompt string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.Timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, r.AgentCmd[0], r.AgentCmd[1:]...)
+	cmd.Dir = r.Dir
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Env = without(os.Environ(), "CLAUDECODE") // a nested Claude Code refuses to start otherwise
 	out, err := cmd.Output()

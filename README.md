@@ -55,9 +55,18 @@ integration tests, one diagram each, in `TESTING.md`.
 
 Not built: the mobile app (spec in `MOBILE_APP.md`), Darwin, Alike as a memory source.
 
+## Integrations fail on their own
+
+The board and the agent need no key. Every other integration is off without its key, and its
+failures stay inside it: a Dial call that does not go through hands the task back with the reason,
+a Keewano post that fails is logged and the event stays in the local table, a chat-model summary
+that fails becomes a plain sentence. The agent runs in a scratch folder (`AGENT_DIR`), so nothing a
+project carries — hooks, settings, files — is in its way or at its mercy.
+
 ## Calls
 
-A committed task that names a phone number is a call, not a coding job: the run places it through
+A committed task that says *call* (or phone, ring, dial) and names a phone number is a call, not a
+coding job: the run places it through
 [Dial](https://getdial.ai) with the task and its context as the voice agent's instruction, waits for
 it to end, and closes the task with a summary. The transcript comes back as the next step, **Review
 call notes: …**, unstaged with the transcript in its context. A busy, unanswered or failed call hands

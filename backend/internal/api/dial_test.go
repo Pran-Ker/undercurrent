@@ -37,7 +37,7 @@ func fakeDial(t *testing.T, script map[string][2]string) (*httptest.Server, map[
 	return srv, placed
 }
 
-// I11 · a committed task that names a phone number is a call: Dial places it with the task as the
+// I11 · a committed task that says call and names a phone number is a call: Dial places it with the task as the
 // instruction, the transcript becomes the run's step, the task closes with a summary, and "Review
 // call notes" appears as the next step with the transcript in its context. An unanswered call hands
 // the task back with the reason.
@@ -49,7 +49,7 @@ func TestI11CommittedCallTaskDialsAndLeavesReviewNotes(t *testing.T) {
 	t.Setenv("DIAL_API_KEY", "test-key")
 	t.Setenv("DIAL_BASE_URL", dialSrv.URL)
 	t.Setenv("DIAL_FROM_NUMBER", "+15550001111")
-	srv := flows(t, fakeAgent(t, "!fail"), chatSaying(`{"summary": "The clinic offered Tuesday at 9 and the appointment was booked."}`))
+	srv := flows(t, fakeAgent(t, verdict("done", "Texted the gate code.", "", "")), chatSaying(`{"summary": "The clinic offered Tuesday at 9 and the appointment was booked."}`))
 
 	task := staged(t, srv, "call the dentist at +14155550123 and book a morning slot", "Elm street clinic; any weekday morning; it is for Sam")
 	var run store.Run
@@ -91,6 +91,14 @@ func TestI11CommittedCallTaskDialsAndLeavesReviewNotes(t *testing.T) {
 	call(t, srv, "GET", "/tasks?stage=unstaged", "", &unstaged)
 	if len(unstaged) != 1 {
 		t.Errorf("an unanswered call must not leave review notes; unstaged = %+v", unstaged)
+	}
+
+	// a number without a call verb is not a call: the task goes to the agent as usual
+	text := staged(t, srv, "text the plumber at +14155550177 the gate code", "it is 4421")
+	call(t, srv, "POST", "/tasks/"+text.ID+"/commit", "", &run)
+	call(t, srv, "GET", "/runs/"+run.ID, "", &run)
+	if run.Status != "done" || run.Steps[0].Kind != "agent" || placed["to"] != "+14155550199" {
+		t.Errorf("text task: run = %+v placed = %v", run, placed)
 	}
 }
 
