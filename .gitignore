@@ -6,3 +6,4 @@ node_modules/
 .expo/
 backend/bin/
 __pycache__/
+.claude/settings.local.json
