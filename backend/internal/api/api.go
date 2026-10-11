@@ -119,7 +119,11 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]any{"ok": true, "tasks": n})
+	out := map[string]any{"ok": true, "tasks": n}
+	if id := os.Getenv("RAILWAY_DEPLOYMENT_ID"); id != "" {
+		out["deployment"] = id // which build is answering; deploy.sh waits for the one it just sent
+	}
+	writeJSON(w, 200, out)
 }
 
 func (a *API) list(w http.ResponseWriter, r *http.Request) {

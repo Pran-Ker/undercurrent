@@ -69,8 +69,8 @@ The mobile app is built (`mobile-app/`, SwiftUI; the call screen runs on the Ele
 
 `Dockerfile` at the root builds the backend into one image with the board page and pi as the agent
 command (committed tasks run on OpenRouter's gemini-3.5-flash-lite inside the container). Railway
-builds it as is: `railway init`, set the variables from `.env.example`, `railway up`, `railway
-domain`. Set `UNDERCURRENT_API_KEY` there: with it, every request but the health check and the page
+builds it as is: `railway init`, set the variables from `.env.example`, then `./deploy.sh` — a
+direct upload of this working tree (no git hook) that waits for the new build to answer. Set `UNDERCURRENT_API_KEY` there: with it, every request but the health check and the page
 needs `Authorization: Bearer <key>`, so only people with the key can reach the board.
 `MOBILE_APP.md` has the exact steps.
 
