@@ -40,10 +40,6 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.canvas, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Text("undercurrent").font(Theme.mono(13)).tracking(0.5).foregroundStyle(Theme.ink)
-                    .accessibilityAddTraits(.isHeader)
-            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { path.append(Route.time) } label: {
                     Image(systemName: "clock.arrow.circlepath").font(.system(size: 15, weight: .regular))
