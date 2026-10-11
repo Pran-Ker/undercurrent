@@ -42,6 +42,9 @@
   .who td { padding: 2px 10px 2px 0; }
   .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; }
   .toast.show { opacity: 1; }
+  #call-panel { margin: 0 16px 8px; padding: 8px 10px; background: #eef6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 13px; }
+  #call-panel.error { background: #fef2f2; border-color: #fecaca; }
+  #call-panel .lines { margin: 6px 0 0; font: 12px ui-monospace, Menlo, monospace; white-space: pre-wrap; }
   @media (max-width: 1100px) { main { grid-template-columns: 1fr 1fr; } aside { position: static; max-height: none; } }
 </style>
 <header>
@@ -50,6 +53,7 @@
   <button id="call" title="talk to the agent">Call</button>
   <button id="refresh">Refresh</button>
 </header>
+<div id="call-panel" hidden><b class="state"></b> <span class="detail muted"></span><pre class="lines"></pre></div>
 <main>
   <div class="col" data-stage="unstaged"><h2>unstaged <span id="n-unstaged"></span></h2><div class="cards"></div></div>
   <div class="col" data-stage="staged"><h2>staged <span id="n-staged"></span></h2><div class="cards"></div></div>
@@ -171,35 +175,58 @@ slider.addEventListener("input", async () => {
 });
 document.getElementById("back-to-now").onclick = () => { viewingAt = null; load(); };
 document.getElementById("restore").onclick = () => { if (!viewingAt) return toast("move the slider first"); if (!confirm("Restore the board to " + viewingAt + "? Nothing is deleted; compensating events are written.")) return; act(() => api("/restore?at=" + encodeURIComponent(viewingAt), { method: "POST" }).then(j => toast(`restored ${j.restored}, closed ${j.closed}`)), null).then(() => { viewingAt = null; load(); }); };
-// the call: the ElevenLabs client SDK in this page; its client tools call this backend, so no public URL
+// the call: the ElevenLabs client SDK in this page; its client tools call this backend, so no public URL.
+// The panel under the header says what is going on and keeps an error on screen; the board on the
+// left follows every tool call at once.
 let convo = null, transcript = [], conversationId = "";
-const callBtn = document.getElementById("call");
+const callBtn = document.getElementById("call"), panel = document.getElementById("call-panel");
+function callStatus(state, detail) {
+  panel.hidden = false; panel.classList.toggle("error", state === "error");
+  panel.querySelector(".state").textContent = state;
+  if (detail !== undefined) panel.querySelector(".detail").textContent = detail;
+  panel.querySelector(".lines").textContent = transcript.slice(-4).map(t => (t.role === "user" ? "you: " : "agent: ") + t.message).join("\n");
+  console.log("[call]", state, detail || "");
+}
 async function runTool(name, params, secret) {
-  const r = await fetch(`/live/tools/${name}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Secret": secret }, body: JSON.stringify({ ...params, conversation_id: conversationId }) });
-  const j = await r.json();
-  return j.ok ? j.result : (j.needs_confirmation ? `NEEDS CONFIRMATION — read this back and wait for a yes: ${j.read_back}` : `ERROR: ${j.error}`);
+  callStatus("connected", `${name} ${JSON.stringify(params)}`);
+  try {
+    const r = await fetch(`/live/tools/${name}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Secret": secret }, body: JSON.stringify({ ...params, conversation_id: conversationId }) });
+    const j = await r.json();
+    load();
+    const out = j.ok ? j.result : (j.needs_confirmation ? `NEEDS CONFIRMATION — read this back and wait for a yes: ${j.read_back}` : `ERROR: ${j.error}`);
+    callStatus("connected", `${name} → ${out.slice(0, 160)}`);
+    return out;
+  } catch (e) { callStatus("connected", `${name} failed: ${e.message}`); return "ERROR: " + e.message; }
 }
 callBtn.onclick = async () => {
   if (convo) { await convo.endSession(); return; }
+  callBtn.disabled = true;
   try {
+    callStatus("connecting", "checking the backend");
     const cfg = await api("/live/config");
-    if (!cfg.configured) return toast("set ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID and LIVE_TOOL_SECRET, run `undercurrent elevenlabs sync`");
-    const { signed_url } = await api("/live/signed-url");
+    if (!cfg.configured) throw new Error("set ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID and LIVE_TOOL_SECRET, then run `undercurrent elevenlabs sync`");
+    callStatus("connecting", "asking for the microphone");
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    callStatus("connecting", "loading the ElevenLabs client");
     const { Conversation } = await import("https://esm.sh/@elevenlabs/client@1.26.0");
+    const { signed_url } = await api("/live/signed-url");
     const clientTools = Object.fromEntries(cfg.tools.map(n => [n, p => runTool(n, p || {}, cfg.secret)]));
     transcript = [];
+    callStatus("connecting", "starting the conversation");
     convo = await Conversation.startSession({
       signedUrl: signed_url, clientTools, dynamicVariables: { user_id: "owner", board: cfg.board },
-      onConnect: ({ conversationId: id }) => { conversationId = id; callBtn.textContent = "Hang up"; toast("connected — talk"); },
-      onMessage: ({ message, role, source }) => { transcript.push({ role: role || (source === "user" ? "user" : "agent"), message }); },
-      onDisconnect: async () => {
+      onConnect: ({ conversationId: id }) => { conversationId = id; callBtn.textContent = "Hang up"; callStatus("connected", "talk — the agent knows the board; say where a task should go"); },
+      onMessage: ({ message, role, source }) => { transcript.push({ role: role || (source === "user" ? "user" : "agent"), message }); callStatus("connected"); },
+      onDisconnect: async d => {
         callBtn.textContent = "Call"; convo = null;
+        callStatus("ended", d && d.reason === "error" ? "the connection dropped: " + (d.message || "") : "");
         if (transcript.length) await fetch("/live/post-call", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "post_call_transcription", data: { conversation_id: conversationId, transcript, analysis: {} } }) }).catch(() => {});
-        toast("call ended"); load();
+        load();
       },
-      onError: m => toast("call: " + m),
+      onError: (m, ctx) => callStatus("error", m + (ctx ? " " + JSON.stringify(ctx).slice(0, 200) : "")),
     });
-  } catch (e) { toast("call: " + e.message); callBtn.textContent = "Call"; convo = null; }
+  } catch (e) { callStatus("error", e.message); callBtn.textContent = "Call"; convo = null; }
+  callBtn.disabled = false;
 };
 load(); setInterval(() => { if (!viewingAt) load(); }, 4000);
 </script>
