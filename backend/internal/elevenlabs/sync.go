@@ -86,10 +86,11 @@ func (c *client) tool(t Tool, url, secret string) (string, error) {
 	}}
 	key := "elevenlabs_tool_" + t.Name
 	if id := c.s.Meta(key); id != "" {
-		if _, err := c.do("PATCH", "/convai/tools/"+id, body); err == nil {
-			c.log("  ✓ tool %s updated (%s)", t.Name, id)
-			return id, nil
+		if _, err := c.do("PATCH", "/convai/tools/"+id, body); err != nil {
+			return "", fmt.Errorf("could not update %s: %w", id, err)
 		}
+		c.log("  ✓ tool %s updated (%s)", t.Name, id)
+		return id, nil
 	}
 	out, err := c.do("POST", "/convai/tools", body)
 	if err != nil {
@@ -99,7 +100,9 @@ func (c *client) tool(t Tool, url, secret string) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("no id in %v", out)
 	}
-	c.s.SetMeta(key, id)
+	if err := c.s.SetMeta(key, id); err != nil {
+		return "", fmt.Errorf("created tool %s (%s) but could not remember it: %w", t.Name, id, err)
+	}
 	c.log("  ✓ tool %s created (%s)", t.Name, id)
 	return id, nil
 }
@@ -117,12 +120,11 @@ func (c *client) agent(spec Spec, toolIDs []string) (string, error) {
 	body := map[string]any{"name": spec.Name, "conversation_config": conv,
 		"platform_settings": map[string]any{"auth": map[string]any{"enable_auth": true}}}
 	if id := c.s.Meta("elevenlabs_agent_id"); id != "" {
-		if _, err := c.do("PATCH", "/convai/agents/"+id, body); err == nil {
-			c.log("  ✓ agent %s updated (%s)", spec.Name, id)
-			return id, nil
-		} else {
-			c.log("  · agent %s could not be updated (%v); creating anew", id, err)
+		if _, err := c.do("PATCH", "/convai/agents/"+id, body); err != nil {
+			return "", fmt.Errorf("could not update agent %s: %w", id, err)
 		}
+		c.log("  ✓ agent %s updated (%s)", spec.Name, id)
+		return id, nil
 	}
 	out, err := c.do("POST", "/convai/agents/create", body)
 	if err != nil {
@@ -132,7 +134,9 @@ func (c *client) agent(spec Spec, toolIDs []string) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("no agent_id in %v", out)
 	}
-	c.s.SetMeta("elevenlabs_agent_id", id)
+	if err := c.s.SetMeta("elevenlabs_agent_id", id); err != nil {
+		return "", fmt.Errorf("created agent %s but could not remember it: %w", id, err)
+	}
 	c.log("  ✓ agent %s created (%s)", spec.Name, id)
 	return id, nil
 }
