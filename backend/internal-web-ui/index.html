@@ -1,27 +1,185 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>undercurrent — board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>undercurrent</title>
 <style>
-  body { font: 14px/1.4 system-ui, sans-serif; margin: 24px; color: #222; }
-  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .col h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: #666; }
-  .card { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #fff; }
-  .card small { color: #888; }
-  .muted { color: #888; }
+  :root { --ink: #1f2328; --mute: #6b7280; --line: #e5e7eb; --bg: #fafaf9; --card: #fff; --accent: #2563eb; --warn: #b45309; --ok: #15803d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; z-index: 2; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; font-weight: 650; letter-spacing: .01em; }
+  header input { flex: 1; max-width: 520px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  header button, .btn { padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); font: inherit; cursor: pointer; }
+  header button.primary, .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  main { display: grid; grid-template-columns: 1fr 1fr 1fr 360px; gap: 14px; padding: 16px 20px; min-height: calc(100vh - 120px); }
+  .col { background: #f3f4f6; border-radius: 10px; padding: 10px; min-height: 240px; }
+  .col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin: 4px 6px 10px; display: flex; justify-content: space-between; }
+  .col.over { outline: 2px dashed var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; cursor: grab; }
+  .card:hover { border-color: #c7d2fe; }
+  .card.sel { border-color: var(--accent); box-shadow: 0 0 0 2px #dbeafe; }
+  .card .id { font: 11px ui-monospace, Menlo, monospace; color: var(--mute); }
+  .card .tags { color: var(--mute); font-size: 12px; }
+  .card .ctx { color: #374151; font-size: 12px; margin-top: 3px; }
+  .card .run { font-size: 12px; margin-top: 4px; }
+  .run.needs_you { color: var(--warn); font-weight: 600; }
+  .run.done { color: var(--ok); }
+  .run.failed { color: #b91c1c; }
+  aside { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; position: sticky; top: 70px; align-self: start; max-height: calc(100vh - 100px); overflow: auto; }
+  aside h3 { margin: 0 0 6px; font-size: 15px; }
+  aside label { display: block; color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 4px; }
+  aside textarea, aside input[type=text] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  aside textarea { min-height: 64px; resize: vertical; }
+  aside .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .steps { font: 12px ui-monospace, Menlo, monospace; white-space: pre-wrap; background: #f9fafb; border: 1px solid var(--line); border-radius: 6px; padding: 8px; max-height: 220px; overflow: auto; }
+  .q { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+  footer { padding: 12px 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  footer section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  footer h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin: 0 0 8px; }
+  input[type=range] { width: 100%; }
+  .muted { color: var(--mute); }
+  .closed-list { font-size: 13px; }
+  .who td { padding: 2px 10px 2px 0; }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr 1fr; } aside { position: static; max-height: none; } }
 </style>
-<h1>undercurrent</h1>
-<p class="muted">The internal board. Reads <code>GET /tasks</code>; drag and drop, detail, calls and the time slider are not built yet.</p>
-<div class="board" id="board"></div>
+<header>
+  <h1>undercurrent</h1>
+  <input id="add" placeholder="write a task down — Enter adds it to unstaged">
+  <button id="call" title="talk to the agent">Call</button>
+  <button id="refresh">Refresh</button>
+</header>
+<main>
+  <div class="col" data-stage="unstaged"><h2>unstaged <span id="n-unstaged"></span></h2><div class="cards"></div></div>
+  <div class="col" data-stage="staged"><h2>staged <span id="n-staged"></span></h2><div class="cards"></div></div>
+  <div class="col" data-stage="committed"><h2>committed <span id="n-committed"></span></h2><div class="cards"></div></div>
+  <aside id="detail"><p class="muted">Pick a card. Drag a card to stage it, commit it, or close it.</p></aside>
+</main>
+<footer>
+  <section>
+    <h2>time travel</h2>
+    <input type="range" id="slider" min="0" max="0" value="0">
+    <div id="slider-label" class="muted">now</div>
+    <div class="row" style="margin-top:8px"><button class="btn" id="restore">Restore the board to this moment</button> <button class="btn" id="back-to-now">Back to now</button></div>
+  </section>
+  <section>
+    <h2>who did what · last 24 h</h2>
+    <table class="who" id="who"></table>
+    <h2 style="margin-top:12px">closed <span id="n-closed"></span></h2>
+    <div class="closed-list" id="closed"></div>
+  </section>
+</footer>
+<div class="col" data-stage="closed" style="display:none"><div class="cards"></div></div>
+<div class="toast" id="toast"></div>
 <script>
-  const stages = ["unstaged", "staged", "committed", "closed"];
-  fetch("/tasks").then(r => r.json()).then(tasks => {
-    const board = document.getElementById("board");
-    for (const stage of stages) {
-      const col = document.createElement("div"); col.className = "col";
-      const rows = tasks.filter(t => t.stage === stage);
-      col.innerHTML = `<h2>${stage} · ${rows.length}</h2>` + rows.map(t =>
-        `<div class="card">${t.text}<br><small>${t.id}${t.tags.length ? " · " + t.tags.map(x => "+" + x).join(" ") : ""}${t.context ? "<br>" + t.context : ""}</small></div>`).join("");
-      board.appendChild(col);
-    }
+const api = (path, opts = {}) => fetch(path, { headers: { "Content-Type": "application/json", "X-Actor": "user" }, ...opts }).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; });
+let tasks = [], runs = [], events = [], selected = null, viewingAt = null;
+const toast = m => { const t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); };
+const esc = s => (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function load() {
+  [tasks, runs, events] = await Promise.all([api("/tasks"), api("/runs"), api("/events")]);
+  if (viewingAt) { const s = await api("/state?at=" + encodeURIComponent(viewingAt)); tasks = s.tasks; }
+  render();
+}
+function runFor(id) { return runs.find(r => r.task_id === id && r.kind === "commit" && r.status !== "done" && r.status !== "failed") || runs.find(r => r.task_id === id); }
+function render() {
+  for (const stage of ["unstaged", "staged", "committed", "closed"]) {
+    const rows = tasks.filter(t => t.stage === stage);
+    const n = document.getElementById("n-" + stage); if (n) n.textContent = rows.length;
+    const col = document.querySelector(`.col[data-stage=${stage}] .cards`);
+    col.innerHTML = rows.map(t => {
+      const run = stage === "committed" ? runFor(t.id) : null;
+      return `<div class="card ${selected === t.id ? "sel" : ""}" draggable="${viewingAt ? "false" : "true"}" data-id="${t.id}">
+        <div>${esc(t.text)}</div>
+        <div><span class="id">${t.id}</span> <span class="tags">${t.tags.map(x => "+" + esc(x)).join(" ")}</span>${t.parent_id ? ` <span class="id">← ${t.parent_id}</span>` : ""}</div>
+        ${t.context ? `<div class="ctx">${esc(t.context)}</div>` : ""}
+        ${run ? `<div class="run ${run.status}">${run.status === "needs_you" ? "needs you: " + esc(run.question) : run.status}</div>` : ""}
+      </div>`;
+    }).join("");
+  }
+  document.getElementById("closed").innerHTML = tasks.filter(t => t.stage === "closed").map(t => `<div><span class="id">${t.id}</span> ${esc(t.text)} <span class="muted">${t.done || ""}</span></div>`).join("") || "<span class='muted'>nothing</span>";
+  const sl = document.getElementById("slider"); sl.max = Math.max(events.length - 1, 0); if (!viewingAt) sl.value = sl.max;
+  renderDetail(); renderWho();
+}
+function renderDetail() {
+  const el = document.getElementById("detail");
+  const t = tasks.find(x => x.id === selected);
+  if (!t) { el.innerHTML = `<p class="muted">Pick a card. Drag a card to stage it, commit it, or close it.</p>`; return; }
+  const run = runFor(t.id);
+  const taskRuns = runs.filter(r => r.task_id === t.id);
+  el.innerHTML = `
+    <h3>${esc(t.text)}</h3>
+    <div class="muted"><span class="id">${t.id}</span> · ${t.stage}${t.due ? " · due " + t.due : ""}${t.priority ? " · " + t.priority : ""} · by ${t.created_by}</div>
+    <label>words</label><input type="text" id="d-text" value="${esc(t.text)}">
+    <label>context</label><textarea id="d-ctx">${esc(t.context)}</textarea>
+    <div class="row">
+      <button class="btn" id="d-save">Save</button>
+      ${t.stage === "unstaged" ? `<button class="btn primary" id="d-stage">Stage with this context</button>` : ""}
+      ${t.stage === "staged" ? `<button class="btn primary" id="d-commit">Commit to agent</button>` : ""}
+      ${t.stage !== "closed" && t.stage !== "committed" ? `<button class="btn" id="d-close">Close</button>` : ""}
+    </div>
+    ${t.stage === "staged" ? `<label>retransform</label><textarea id="d-instr" placeholder="the first half is done, the rest is… · split this into… · add that…"></textarea><div class="row"><button class="btn" id="d-retransform">Retransform</button></div>` : ""}
+    ${t.note ? `<label>notes</label><div class="steps">${esc(t.note)}</div>` : ""}
+    ${run && run.status === "needs_you" ? `<div class="q"><b>The agent asks:</b> ${esc(run.question)}<textarea id="d-answer" placeholder="your answer"></textarea><div class="row"><button class="btn primary" id="d-answer-btn">Answer</button></div></div>` : ""}
+    ${taskRuns.length ? `<label>runs</label>` + taskRuns.map(r => `<div class="steps"><b>${r.kind} ${r.id} · ${r.status}</b>${r.result ? "\n" + esc(r.result) : ""}\n` + r.steps.map(s => `${s.at.slice(11, 16)} ${s.kind}${s.cmd ? " " + esc(s.cmd) : ""}${s.exit ? " exit " + s.exit : ""}${s.ms ? " " + s.ms + "ms" : ""}${s.note ? " — " + esc(s.note) : ""}${s.output ? "\n  " + esc(s.output.slice(0, 600)) : ""}`).join("\n") + `</div>`).join("") : ""}
+  `;
+  const on = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
+  on("d-save", () => act(() => api(`/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ text: val("d-text"), context: val("d-ctx") }) }), "saved"));
+  on("d-stage", () => { const c = val("d-ctx"); if (!c.trim()) return toast("context is what staging is"); act(() => api(`/tasks/${t.id}/stage`, { method: "POST", body: JSON.stringify({ context: c }) }), "staged"); });
+  on("d-commit", () => act(() => api(`/tasks/${t.id}/commit`, { method: "POST" }), "committed — the agent is on it"));
+  on("d-close", () => act(() => api(`/tasks/${t.id}/close`, { method: "POST" }), "closed"));
+  on("d-retransform", () => { const i = val("d-instr"); if (!i.trim()) return; act(() => api(`/tasks/${t.id}/retransform`, { method: "POST", body: JSON.stringify({ instruction: i }) }).then(j => toast(j.say || "done")), null); });
+  on("d-answer-btn", () => { const a = val("d-answer"); if (!a.trim()) return; act(() => api(`/runs/${run.id}/answer`, { method: "POST", body: JSON.stringify({ answer: a }) }), "answered"); });
+}
+const val = id => document.getElementById(id).value;
+async function act(fn, msg) { try { await fn(); if (msg) toast(msg); await load(); } catch (e) { toast(e.message); } }
+function renderWho() {
+  api("/who-did-what").then(w => {
+    document.getElementById("who").innerHTML = w.actors.map(a => `<tr><td><b>${esc(a.actor)}</b></td><td>${Object.entries(a.actions).map(([k, v]) => `${k} ${v}`).join(" · ")}</td><td class="muted">${a.tasks} tasks</td></tr>`).join("") || "<tr><td class='muted'>nothing yet</td></tr>";
+  }).catch(() => {});
+}
+// cards: select and drag
+document.addEventListener("click", e => { const c = e.target.closest(".card"); if (c) { selected = c.dataset.id; render(); } });
+document.addEventListener("dragstart", e => { const c = e.target.closest(".card"); if (c) e.dataTransfer.setData("text/plain", c.dataset.id); });
+for (const col of document.querySelectorAll(".col")) {
+  col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("over"); });
+  col.addEventListener("dragleave", () => col.classList.remove("over"));
+  col.addEventListener("drop", async e => {
+    e.preventDefault(); col.classList.remove("over");
+    const id = e.dataTransfer.getData("text/plain"), t = tasks.find(x => x.id === id), to = col.dataset.stage;
+    if (!t || t.stage === to) return;
+    selected = id;
+    if (to === "staged") { const c = prompt("Context — what done looks like, constraints, who to contact:", t.context || ""); if (c === null || !c.trim()) return; return act(() => api(`/tasks/${id}/stage`, { method: "POST", body: JSON.stringify({ context: c }) }), "staged"); }
+    if (to === "committed") { if (t.stage !== "staged") return toast("stage it first"); return act(() => api(`/tasks/${id}/commit`, { method: "POST" }), "committed"); }
+    if (to === "closed") return act(() => api(`/tasks/${id}/close`, { method: "POST" }), "closed");
+    if (to === "unstaged") return toast("a task does not go back to unstaged; close it or edit it");
   });
+}
+// add
+document.getElementById("add").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.value.trim()) { const text = e.target.value.trim(); e.target.value = ""; act(() => api("/tasks", { method: "POST", body: JSON.stringify({ text }) }), "written down"); } });
+document.getElementById("refresh").onclick = load;
+// time travel
+const slider = document.getElementById("slider");
+slider.addEventListener("input", async () => {
+  const i = Number(slider.value);
+  if (!events.length || i >= events.length - 1) { viewingAt = null; document.getElementById("slider-label").textContent = "now"; return load(); }
+  const e = events[i]; viewingAt = e.at;
+  document.getElementById("slider-label").textContent = `after ${e.actor} · ${e.action}${e.task_id ? " · " + e.task_id : ""} at ${e.at.replace("T", " ").slice(0, 19)}`;
+  const s = await api("/state?at=" + encodeURIComponent(viewingAt)); tasks = s.tasks; render();
+});
+document.getElementById("back-to-now").onclick = () => { viewingAt = null; load(); };
+document.getElementById("restore").onclick = () => { if (!viewingAt) return toast("move the slider first"); if (!confirm("Restore the board to " + viewingAt + "? Nothing is deleted; compensating events are written.")) return; act(() => api("/restore?at=" + encodeURIComponent(viewingAt), { method: "POST" }).then(j => toast(`restored ${j.restored}, closed ${j.closed}`)), null).then(() => { viewingAt = null; load(); }); };
+// the call
+document.getElementById("call").onclick = async () => {
+  try {
+    const { signed_url, agent_id } = await api("/live/signed-url");
+    if (!document.querySelector("script[data-el]")) { const s = document.createElement("script"); s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed"; s.async = true; s.dataset.el = "1"; document.body.appendChild(s); }
+    document.querySelectorAll("elevenlabs-convai").forEach(e => e.remove());
+    const w = document.createElement("elevenlabs-convai"); w.setAttribute("agent-id", agent_id); w.setAttribute("signed-url", signed_url); document.body.appendChild(w);
+    toast("the call widget is at the bottom right");
+  } catch (e) { toast("call not configured: " + e.message); }
+};
+load(); setInterval(() => { if (!viewingAt) load(); }, 4000);
 </script>

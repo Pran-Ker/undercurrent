@@ -98,12 +98,3 @@ func TestDirectActionsLeaveEvents(t *testing.T) {
 		t.Errorf("the stage event should carry before and after: %+v", evs[1])
 	}
 }
-
-// What is not built says so, rather than pretending.
-func TestUnbuiltEndpointsSaySo(t *testing.T) {
-	srv := scratch(t)
-	var body map[string]string
-	if code := call(t, srv, "POST", "/tasks/x/commit", "", &body); code != 501 || body["error"] != "not built yet" {
-		t.Errorf("commit: %d %v", code, body)
-	}
-}

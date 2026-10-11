@@ -19,14 +19,17 @@ import (
 //go:embed sql/*.sql
 var sqlFiles embed.FS
 
-type Store struct{ DB *sql.DB }
+type Store struct {
+	DB      *sql.DB
+	OnEvent func(Event) // set by main: the Keewano forwarder; nil in tests
+}
 
 // Open reads the environment: TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN), else UNDERCURRENT_DB
 // (a `file:` path, default file:undercurrent.db).
 func Open() (*Store, error) {
 	if url := os.Getenv("TURSO_DATABASE_URL"); url != "" {
 		db, err := sql.Open("libsql", url+"?authToken="+os.Getenv("TURSO_AUTH_TOKEN"))
-		return &Store{db}, err
+		return &Store{DB: db}, err
 	}
 	path := os.Getenv("UNDERCURRENT_DB")
 	if path == "" {
@@ -41,7 +44,7 @@ func OpenFile(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	return &Store{db}, nil
+	return &Store{DB: db}, nil
 }
 
 // Migrate applies the schema and every migration, in order; a statement that has already been

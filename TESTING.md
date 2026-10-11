@@ -1,15 +1,66 @@
 # Testing
 
-Integration tests drive the real HTTP API against a scratch database seeded with the demo set.
-Agents, phones and the voice platform are replaced by scripted or simulated counterparts that
-behave like the real thing on the wire; nothing in a test is faked silently. Each integration
-test has one diagram of the flow it holds. Smaller tests get a line.
+Integration tests drive the real HTTP API against a scratch database. The agent command is a
+scripted shell counterpart that reads the prompt and prints a scripted verdict (and can fail on
+cue); the chat model is an HTTP server answering with scripted operations; the voice platform is
+simulated by calling the live endpoints with a real secret and a real signature. Nothing in a test
+pretends silently: every counterpart behaves like the real thing on the wire, and every check is on
+the database afterwards. Each integration test has one diagram of the flow it holds.
 
 Run: `cd backend && go test ./...`
 
-## Integration tests
+## I1 · commit runs the agent and yields the next step — `TestI1CommitRunsTheAgentAndYieldsTheNextStep`
 
-### I4 · direct actions leave events — `TestDirectActionsLeaveEvents` ✓
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant G as agent command
+  participant D as database
+  U->>A: POST /tasks, POST /tasks/:id/stage (context)
+  U->>A: POST /tasks/:id/commit
+  A->>D: stage = committed, run queued, event commit
+  A->>G: prompt on stdin (task, context, the verdict contract)
+  G-->>A: UNDERCURRENT: {outcome done, note, next}
+  A->>D: task closed with the note, event close by agent:run
+  A->>D: next step added unstaged with parent_id, event add
+  U->>A: GET /runs/:id, GET /tasks?stage=unstaged
+  A-->>U: run done with one agent step, the next step on the board
+```
+
+## I2 · retransform completes and yields the next — `TestI2RetransformCompletesAndYieldsTheNext`
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant M as chat model
+  participant D as database
+  U->>A: POST /tasks/:id/retransform (the forms are filled, now post them)
+  A->>M: task, context, instruction, the operations contract
+  M-->>A: ops complete with a next step, say
+  A->>D: task closed with the note, event close by agent:run
+  A->>D: next step added staged with its context, event add
+  A-->>U: run done, say
+```
+
+## I3 · retransform splits into children — `TestI3RetransformSplitsIntoChildren`
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant M as chat model
+  participant D as database
+  U->>A: POST /tasks/:id/retransform (split into kitchen, books, van)
+  M-->>A: ops split with three children
+  A->>D: three staged children with parent_id, one event add each
+  A->>D: parent closed, note split into 3, event close
+  U->>A: GET /tasks?stage=staged
+  A-->>U: the three children
+```
+
+## I4 · direct actions leave events — `TestDirectActionsLeaveEvents`
 
 ```mermaid
 sequenceDiagram
@@ -27,25 +78,127 @@ sequenceDiagram
   U->>A: POST /tasks/:id/close again
   A-->>U: 409 already closed
   U->>A: GET /events?task=:id
-  A-->>U: add, stage, edit, close — all by user
+  A-->>U: add, stage, edit, close, all by user
 ```
 
-### Planned
+## I5 · live tools read back, then land — `TestI5LiveToolsReadBackThenLand`
 
-| # | Flow | Holds |
-|---|---|---|
-| I1 | stage → commit → run completes → next step unstaged | closed with a note, a child with `parent_id`, events in order |
-| I2 | retransform: half done, the rest is X → complete and yield | old closed, new staged with the given context |
-| I3 | retransform: split into three | three staged children, parent closed |
-| I5 | live: add and commit by voice → read-back → confirmed | first call returns the read-back, the second lands; `live:` actor |
-| I6 | run asks → answer → resumes → done | `needs_you` then `done`, the answer in the steps |
-| I7 | time travel: six actions, three moments | each board matches its snapshot |
-| I8 | who-did-what over a mixed day | counts per actor |
-| I9 | failure injection: the phone tool fails twice then succeeds | bounded retries; a fourth failure fails the run and hands the task back |
-| I10 | post-call webhook → live session → recall | a later question returns the summary with its citation |
+```mermaid
+sequenceDiagram
+  participant V as voice platform (simulated)
+  participant A as API
+  participant G as agent command
+  participant D as database
+  V->>A: POST /live/tools/add_task (text, context) with the secret
+  A->>D: task staged, event add by live:conv1
+  V->>A: POST /live/tools/commit_task (ref dentist)
+  A-->>V: needs_confirmation, read_back Commit k79l book the dentist?
+  Note over V: nothing landed
+  V->>A: POST /live/tools/commit_task (ref dentist, confirmed true)
+  A->>D: committed, event commit by live:conv1
+  A->>G: the run
+  G-->>A: verdict done
+  A->>D: closed, event close by agent:run
+  V->>A: POST /live/tools/list_board with a wrong secret
+  A-->>V: 403
+```
+
+## I6 · the agent asks, the owner answers, the run resumes — `TestI6AnAgentQuestionIsAnsweredAndTheRunResumes`
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant G as agent command
+  participant D as database
+  U->>A: POST /tasks/:id/commit
+  A->>G: prompt
+  G-->>A: UNDERCURRENT: {outcome needs_you, question which card}
+  A->>D: run needs_you with the question, event ask; task stays committed
+  U->>A: POST /runs/:id/answer (the business one)
+  A->>D: step answer, event answer
+  A->>G: prompt with YOU ASKED and THE OWNER ANSWERED
+  G-->>A: UNDERCURRENT: {outcome done, note}
+  A->>D: task closed, run done with three steps
+```
+
+## I7 · time travel and restore — `TestI7StateAtAMoment`
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant D as database
+  U->>A: POST /tasks (first)
+  Note over A,D: t1
+  U->>A: POST /tasks (second), POST /tasks/first/stage
+  Note over A,D: t2
+  U->>A: POST /tasks/first/close
+  U->>A: GET /state?at=t1
+  A-->>U: one task, unstaged
+  U->>A: GET /state?at=t2
+  A-->>U: first staged, second unstaged
+  U->>A: GET /state
+  A-->>U: first closed
+  U->>A: POST /restore?at=t1
+  A->>D: first back to unstaged with no context (event restore), second closed with a note (event restore)
+  A-->>U: restored 1, closed 1
+```
+
+## I8 · who did what — `TestI8WhoDidWhat`
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant V as voice (X-Actor live:conv9)
+  participant A as API
+  participant G as agent command
+  U->>A: add, stage, commit
+  G-->>A: verdict done (close by agent:run)
+  V->>A: POST /tasks (from the call)
+  U->>A: GET /who-did-what
+  A-->>U: user add 1 stage 1 commit 1, agent close 1, live:conv9 add 1
+```
+
+## I9 · bounded retries, then hand back — `TestI9BoundedRetriesThenHandBack`
+
+```mermaid
+sequenceDiagram
+  participant U as user
+  participant A as API
+  participant G as agent command
+  participant D as database
+  U->>A: POST /tasks/flaky/commit
+  A->>G: attempt 1
+  G-->>A: exit 1
+  A->>G: retry after backoff
+  G-->>A: exit 1
+  A->>G: retry
+  G-->>A: verdict done
+  A->>D: run done, steps agent:1 retry:1 retry:0
+  U->>A: POST /tasks/doomed/commit
+  A->>G: four attempts, all exit 1
+  A->>D: run failed, task back to staged with run failed in its note, event hand_back
+```
+
+## I10 · the post-call webhook feeds recall — `TestI10PostCallWebhookFeedsRecall`
+
+```mermaid
+sequenceDiagram
+  participant V as voice platform (simulated)
+  participant A as API
+  participant D as database
+  V->>A: POST /live/post-call with a bad signature
+  A-->>V: 401
+  V->>A: POST /live/post-call signed t=…,v0=hmac(t.body)
+  A->>D: live session (transcript, summary), event call by live:conv42
+  A-->>V: 200
+  V->>A: POST /live/tools/recall (landlord mornings)
+  A-->>V: the session summary, cited by its conversation id
+```
 
 ## Smaller tests
 
-- The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed — `TestTheDemoSetTakesItsStages` ✓
-- An unbuilt endpoint says so with 501 rather than pretending — `TestUnbuiltEndpointsSaySo` ✓
-- Planned: legal transitions only; `state(at)` on an empty log; a bad webhook signature is rejected; the Keewano payload carries only registered ids.
+- The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed — `TestTheDemoSetTakesItsStages`
+- Planned: `state(at)` on an empty log; the Keewano payload builder emits only registered ids
+  (needs no key — `Payload` is exported for it); legal transitions only.

@@ -4,12 +4,30 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
+	"github.com/pran-ker/undercurrent/backend/internal/live"
+	"github.com/pran-ker/undercurrent/backend/internal/oracle"
+	"github.com/pran-ker/undercurrent/backend/internal/runs"
 	"github.com/pran-ker/undercurrent/backend/internal/store"
 )
 
-type API struct{ S *store.Store }
+type API struct {
+	S      *store.Store
+	Runner *runs.Runner
+	Live   *live.Live
+	UI     string // the folder the board page is served from
+}
+
+// New wires the API from the environment: the agent command, the chat model, the live secrets,
+// the transcripts folder the oracle reads.
+func New(s *store.Store) *API {
+	recall := func(q string) string { return oracle.Recall(s, q, os.Getenv("ORACLE_TRANSCRIPTS"), 6) }
+	r := runs.New(s)
+	r.Recall = recall
+	return &API{S: s, Runner: r, Live: live.New(s, r, recall), UI: "internal-web-ui"}
+}
 
 func (a *API) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -20,17 +38,20 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PATCH /tasks/{id}", a.edit)
 	mux.HandleFunc("POST /tasks/{id}/stage", a.stage)
 	mux.HandleFunc("POST /tasks/{id}/close", a.close)
+	mux.HandleFunc("POST /tasks/{id}/commit", a.commit)
+	mux.HandleFunc("POST /tasks/{id}/retransform", a.retransform)
+	mux.HandleFunc("GET /runs", a.runs)
+	mux.HandleFunc("GET /runs/{id}", a.run)
+	mux.HandleFunc("POST /runs/{id}/answer", a.answer)
 	mux.HandleFunc("GET /events", a.events)
-	for _, p := range []string{"POST /tasks/{id}/commit", "POST /tasks/{id}/retransform", "GET /runs", "GET /runs/{id}", "POST /runs/{id}/answer",
-		"GET /state", "GET /who-did-what", "POST /restore", "POST /live/tools/{name}", "GET /live/signed-url", "POST /live/post-call"} {
-		mux.HandleFunc(p, notBuilt)
-	}
-	mux.Handle("GET /", http.FileServer(http.Dir("internal-web-ui")))
+	mux.HandleFunc("GET /state", a.state)
+	mux.HandleFunc("GET /who-did-what", a.whoDidWhat)
+	mux.HandleFunc("POST /restore", a.restore)
+	mux.HandleFunc("POST /live/tools/{name}", a.Live.Tool)
+	mux.HandleFunc("GET /live/signed-url", a.Live.SignedURL)
+	mux.HandleFunc("POST /live/post-call", a.Live.PostCall)
+	mux.Handle("GET /", http.FileServer(http.Dir(a.UI)))
 	return cors(mux)
-}
-
-func notBuilt(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 501, map[string]string{"error": "not built yet", "see": "backend/API.md"})
 }
 
 func cors(h http.Handler) http.Handler {
@@ -231,7 +252,7 @@ func (a *API) transition(w http.ResponseWriter, r *http.Request, action string, 
 }
 
 func (a *API) events(w http.ResponseWriter, r *http.Request) {
-	evs, err := a.S.Events(r.URL.Query().Get("task"), r.URL.Query().Get("actor"))
+	evs, err := a.S.Events(r.URL.Query().Get("task"), r.URL.Query().Get("actor"), r.URL.Query().Get("since"))
 	if err != nil {
 		fail(w, 500, err.Error())
 		return

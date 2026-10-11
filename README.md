@@ -44,6 +44,24 @@ yielded. Closing and editing never need an agent. There is no erase.
 
 ## Status
 
-Day one. Built: the store, the migration, the demo set, `GET /tasks`, add, stage, edit, close,
-events, a read-only board page. Not built: runs (commit, retransform), time travel, the live agent,
-the mobile app. `backend/API.md` says which is which.
+Built and tested: the store, the migration, the demo set, the board and its direct actions, commit
+runs that invoke a coding agent directly and end done or asking, answers that resume a run,
+retransforms through the chat model, bounded retries and hand-back, the event log, the board at any
+moment and restore, who-did-what, the live agent's webhook tools with mechanical confirmation, the
+signed URL, the post-call webhook, recall across the board and your coding conversations, the
+Keewano forwarder (off without a key), the internal board page, and the ElevenLabs agent sync from
+`elevenlabs/agent.json`. Ten integration tests, one diagram each, in `TESTING.md`.
+
+Not built: the mobile app (spec in `MOBILE_APP.md`), phone calls out (Dial), Darwin, Alike as a
+memory source.
+
+## The live agent
+
+```sh
+cloudflared tunnel --url http://127.0.0.1:8787     # or any tunnel; put its https URL in PUBLIC_URL
+go run ./cmd/undercurrent elevenlabs sync          # creates the tools and the agent; prints ELEVENLABS_AGENT_ID
+```
+
+Then set the post-call webhook in the ElevenLabs dashboard to `PUBLIC_URL/live/post-call` and its
+secret in `ELEVENLABS_WEBHOOK_SECRET`. The board page's **Call** button opens the widget on a
+signed URL.

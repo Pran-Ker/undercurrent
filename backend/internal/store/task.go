@@ -107,17 +107,7 @@ type Event struct {
 }
 
 func (s *Store) Record(actor, action string, before, after *Task, note string) error {
-	var taskID string
-	if after != nil {
-		taskID = after.ID
-	} else if before != nil {
-		taskID = before.ID
-	}
-	b, _ := json.Marshal(before)
-	a, _ := json.Marshal(after)
-	_, err := s.DB.Exec(`INSERT INTO event (at, actor, action, task_id, before, after, note) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		Now(), actor, action, taskID, nullJSON(before, b), nullJSON(after, a), note)
-	return err
+	return s.RecordRun(actor, action, "", before, after, note)
 }
 
 func nullJSON(v *Task, b []byte) any {
@@ -127,14 +117,17 @@ func nullJSON(v *Task, b []byte) any {
 	return string(b)
 }
 
-// Events lists the log, newest last; task and actor filter it.
-func (s *Store) Events(taskID, actor string) ([]Event, error) {
+// Events lists the log, newest last; task, actor and since filter it.
+func (s *Store) Events(taskID, actor, since string) ([]Event, error) {
 	q, args := "SELECT id, at, actor, action, coalesce(task_id,''), coalesce(run_id,''), before, after, note FROM event WHERE 1=1", []any{}
 	if taskID != "" {
 		q, args = q+" AND task_id = ?", append(args, taskID)
 	}
 	if actor != "" {
 		q, args = q+" AND actor = ?", append(args, actor)
+	}
+	if since != "" {
+		q, args = q+" AND at >= ?", append(args, since)
 	}
 	rows, err := s.DB.Query(q+" ORDER BY id", args...)
 	if err != nil {
