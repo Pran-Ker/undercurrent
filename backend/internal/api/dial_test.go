@@ -12,7 +12,7 @@ import (
 )
 
 // fakeDial is a scripted counterpart for Dial's REST API: it records the last placement and answers
-// the status poll for a number with the outcome the script gives it — termination and transcript.
+// the status poll for a number with the outcome the script gives it, termination and transcript.
 func fakeDial(t *testing.T, script map[string][2]string) (*httptest.Server, map[string]any) {
 	t.Helper()
 	placed := map[string]any{}
@@ -103,7 +103,7 @@ func TestI11CommittedCallTaskDialsAndLeavesReviewNotes(t *testing.T) {
 }
 
 // TestDialLiveCall places one real call through Dial to DIAL_LIVE_TO and waits for it to end. It
-// runs only with DIAL_LIVE_TEST=1 — calls are metered — and the number comes from the environment,
+// runs only with DIAL_LIVE_TEST=1, calls are metered, and the number comes from the environment,
 // never from the repo. Set OPENROUTER_API_KEY too for a model-written summary.
 func TestDialLiveCall(t *testing.T) {
 	if os.Getenv("DIAL_LIVE_TEST") != "1" {
@@ -121,7 +121,7 @@ func TestDialLiveCall(t *testing.T) {
 		t.Fatalf("commit: %d", code)
 	}
 	call(t, srv, "GET", "/runs/"+run.ID, "", &run)
-	t.Logf("run %s: %s — %s", run.ID, run.Status, run.Result)
+	t.Logf("run %s: %s, %s", run.ID, run.Status, run.Result)
 	for _, s := range run.Steps {
 		t.Logf("step %s · %s · exit %d · %dms\n%s", s.Kind, s.Note, s.Exit, s.Ms, s.Output)
 	}

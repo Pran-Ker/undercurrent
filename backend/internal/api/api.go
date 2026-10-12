@@ -59,7 +59,7 @@ func (a *API) Routes() http.Handler {
 
 // auth makes the backend fit for a public URL: with UNDERCURRENT_API_KEY set, every request but the
 // health check and the page itself must carry the key, as `Authorization: Bearer <key>` or
-// `X-Api-Key`. Without the key set, nothing changes — the backend is local.
+// `X-Api-Key`. Without the key set, nothing changes, the backend is local.
 func auth(key string, h http.Handler) http.Handler {
 	if key == "" {
 		return h

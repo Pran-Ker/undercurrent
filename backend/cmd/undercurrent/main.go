@@ -1,4 +1,4 @@
-// undercurrent — the backend: a board of tasks, the agents that run against them, the events
+// undercurrent, the backend: a board of tasks, the agents that run against them, the events
 // that record every move.
 package main
 
@@ -24,7 +24,7 @@ const usage = `undercurrent <command>
   elevenlabs sync   create or update the live agent and its tools from elevenlabs/agent.json
 
 The database is TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN) or UNDERCURRENT_DB (file:…, the default
-file:undercurrent.db). Settings come from the environment or .env — see .env.example.`
+file:undercurrent.db). Settings come from the environment or .env, see .env.example.`
 
 func main() {
 	config.Load()
@@ -87,7 +87,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("agent %s — set ELEVENLABS_AGENT_ID=%s in .env\n", id, id)
+		fmt.Printf("agent %s, set ELEVENLABS_AGENT_ID=%s in .env\n", id, id)
 	default:
 		fmt.Println(usage)
 		os.Exit(2)

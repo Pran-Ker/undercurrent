@@ -1,4 +1,4 @@
-// Package events forwards the board's events to Keewano as small typed events — categories and
+// Package events forwards the board's events to Keewano as small typed events, categories and
 // counts, never text (S5). Off without KEEWANO_SDK_KEY; the local event table is the truth either way.
 package events
 
@@ -103,7 +103,7 @@ func classify(e store.Event) (string, any) {
 	return "", nil
 }
 
-// Payload is what one event becomes on the wire — exported so a test can see it without a key.
+// Payload is what one event becomes on the wire, exported so a test can see it without a key.
 func (f *Forwarder) Payload(name string, value any) (map[string]any, bool) {
 	var et *EventType
 	for i := range Registry {

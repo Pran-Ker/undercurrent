@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS task (
   from_month TEXT,                                   -- the garage month a tray task was taken from
   tags       TEXT NOT NULL DEFAULT '',
   note       TEXT NOT NULL DEFAULT '',
-  source     TEXT                                    -- where it came from, as origin:key — recur:<template id> for a template's child; call:, text:, email:, calendar: for the outside
+  source     TEXT                                    -- where it came from, as origin:key, recur:<template id> for a template's child; call:, text:, email:, calendar: for the outside
 );
 CREATE INDEX IF NOT EXISTS task_layer ON task (layer, month, done);
 CREATE INDEX IF NOT EXISTS task_source ON task (source);

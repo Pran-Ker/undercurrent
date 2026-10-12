@@ -2,7 +2,7 @@ import SwiftUI
 
 // The reusable pieces of the qoves-style language. Views compose these; they never restyle them.
 
-// "THE BOARD" — a mono uppercase label in a hairline pill.
+// "THE BOARD": a mono uppercase label in a hairline pill.
 struct Eyebrow: View {
     var text: String
     var body: some View {
@@ -119,7 +119,7 @@ extension ButtonStyle where Self == PillButtonStyle {
     static func pill(_ kind: PillButtonStyle.Kind, expand: Bool = true) -> PillButtonStyle { PillButtonStyle(kind: kind, expand: expand) }
 }
 
-// [1]  Get more career opportunities — a numbered row in mono.
+// [1]  Get more career opportunities: a numbered row in mono.
 struct NumberedRow<Content: View>: View {
     var index: Int
     @ViewBuilder var content: Content

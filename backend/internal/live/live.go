@@ -142,7 +142,7 @@ func (l *Live) call(name string, a args, actor string) (map[string]any, error) {
 	}
 	if t.ID == "" {
 		if len(candidates) == 0 {
-			return nil, fmt.Errorf("no task matches “%s” — list the board, or ask which", a.Ref)
+			return nil, fmt.Errorf("no task matches “%s”, list the board, or ask which", a.Ref)
 		}
 		return nil, fmt.Errorf("more than one task matches; ask which:\n%s", board(candidates))
 	}
@@ -271,7 +271,7 @@ func board(tasks []store.Task) string {
 	for _, t := range tasks {
 		line := fmt.Sprintf("%s [%s] %s", t.ID, t.Stage, t.Text)
 		if t.Context != "" {
-			line += " — " + t.Context
+			line += ", " + t.Context
 		}
 		if len(t.Tags) > 0 {
 			line += " +" + strings.Join(t.Tags, " +")
@@ -281,7 +281,7 @@ func board(tasks []store.Task) string {
 	return strings.Join(lines, "\n")
 }
 
-// Config handles GET /live/config: what the board page or the app needs to run a call — the agent
+// Config handles GET /live/config: what the board page or the app needs to run a call, the agent
 // id, the tool secret, and the board as text to hand the agent as a dynamic variable, so it knows
 // every task from the first word. The backend is local; this is not an endpoint to expose.
 func (l *Live) Config(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +302,7 @@ func (l *Live) boardText(stage string) (string, error) {
 	for _, r := range runs {
 		if r.Status == "needs_you" {
 			if t, ok, _ := l.S.Task(r.TaskID); ok {
-				qs = append(qs, fmt.Sprintf("%s “%s” — the agent asks: %s", t.ID, t.Text, r.Question))
+				qs = append(qs, fmt.Sprintf("%s “%s”, the agent asks: %s", t.ID, t.Text, r.Question))
 			}
 		}
 	}
@@ -423,7 +423,7 @@ func Verify(header string, body []byte, secret string, now time.Time) bool {
 	return hmac.Equal([]byte(hex.EncodeToString(mac.Sum(nil))), []byte(sig))
 }
 
-// Sign makes a header the way ElevenLabs does — for tests and for a local simulator.
+// Sign makes a header the way ElevenLabs does, for tests and for a local simulator.
 func Sign(body []byte, secret string, now time.Time) string {
 	ts := strconv.FormatInt(now.Unix(), 10)
 	mac := hmac.New(sha256.New, []byte(secret))

@@ -182,7 +182,7 @@ struct Run: Codable, Identifiable, Equatable {
         if let s = try? c.decodeIfPresent([String].self, forKey: .steps) {
             steps = s
         } else if let objs = try? c.decodeIfPresent([[String: AnyCodable]].self, forKey: .steps) {
-            // API.md: {at, kind, cmd, exit, ms, output, note} — one readable line each.
+            // API.md: {at, kind, cmd, exit, ms, output, note}, one readable line each.
             steps = objs.map { o in
                 if let t = o["text"]?.string ?? o["step"]?.string { return t }
                 var parts: [String] = []

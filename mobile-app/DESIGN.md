@@ -1,4 +1,4 @@
-# Undercurrent — the app's design language
+# Undercurrent: the app's design language
 
 Borrowed from [qoves.com](https://www.qoves.com/): clinical-editorial, slate and white, thin large
 numerals, mono uppercase labels, hairline cards, pill buttons. The site reads like a lab report
@@ -29,15 +29,15 @@ capsules. Gutter 16pt. One spring (`Theme.spring`), one press style (`.pressable
 
 ## Components (`Design/Components.swift`)
 
-- `Eyebrow` — `THE BOARD` in a hairline pill, above every screen title.
-- `TwoToneTitle` — first line ink, second line slate ("Track the board / read the current").
-- `Card` — the white surface everything sits in.
-- `Chip` — tag, count, status; `mono: true` for uppercase status chips.
-- `PillButtonStyle` — primary (dark), secondary (white, hairline), quiet (inset), destructive.
-- `NumberedRow` — `[1]` mono index then content, the site's numbered lists.
-- `StatTile` + `TrackBar` — the biometrics tile: title, verdict chip, big number, a track with a
+- `Eyebrow`: `THE BOARD` in a hairline pill, above every screen title.
+- `TwoToneTitle`: first line ink, second line slate ("Track the board / read the current").
+- `Card`: the white surface everything sits in.
+- `Chip`: tag, count, status; `mono: true` for uppercase status chips.
+- `PillButtonStyle`: primary (dark), secondary (white, hairline), quiet (inset), destructive.
+- `NumberedRow`: `[1]` mono index then content, the site's numbered lists.
+- `StatTile` + `TrackBar`: the biometrics tile: title, verdict chip, big number, a track with a
   `YOU` marker and an `IDEAL` band and mono scale labels.
-- `RingGauge` — a thin ring with a number in it.
+- `RingGauge`: a thin ring with a number in it.
 
 ## Screens
 

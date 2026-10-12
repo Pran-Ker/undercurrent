@@ -117,7 +117,7 @@ func conversations(dir string, limit int) []convo {
 			}
 		}
 		if first != "" || last != "" {
-			out = append(out, convo{ref: filepath.Base(f) + " " + ago(mtime(f)), text: "began: " + clip(first, 160) + " — ended: " + clip(last, 160)})
+			out = append(out, convo{ref: filepath.Base(f) + " " + ago(mtime(f)), text: "began: " + clip(first, 160) + ", ended: " + clip(last, 160)})
 		}
 	}
 	return out

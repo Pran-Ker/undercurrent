@@ -246,7 +246,7 @@ func (s *Store) WhoDidWhat(since string) ([]Actor, error) {
 	return out, rows.Err()
 }
 
-// Resolve turns an id, or enough of a task's words, into the one open task it names — or the
+// Resolve turns an id, or enough of a task's words, into the one open task it names, or the
 // candidates when it is unclear. A voice agent that has not listed will guess an id from words.
 func (s *Store) Resolve(ref string) (Task, []Task, error) {
 	ref = strings.ToLower(strings.TrimSpace(ref))

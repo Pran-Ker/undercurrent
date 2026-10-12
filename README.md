@@ -12,7 +12,7 @@ it was at any moment and read as who-did-what.
 backend/            Go. The board, the API, the runs, the live agent's tools, the event log.
   cmd/undercurrent  the binary: serve · migrate · seed
   internal/store    the database (a local file, or Turso) and the migrations
-  internal/api      the HTTP surface — see API.md
+  internal/api      the HTTP surface, see API.md
   internal-web-ui/  the internal board, a static page served by the backend
   elevenlabs/       the live agent's configuration (phase 2)
   db/               schema.sql, migrations/, demo.sql (42 demo tasks)
@@ -29,7 +29,7 @@ SUGGESTIONS.md      what the references teach, and what to borrow
 cp .env.example .env            # a local file database by default
 cd backend
 go run ./cmd/undercurrent seed  # migrate + the demo set
-go run ./cmd/undercurrent serve # http://127.0.0.1:8787 — the board at /, the API at /tasks
+go run ./cmd/undercurrent serve # http://127.0.0.1:8787: the board at /, the API at /tasks
 go test ./...
 ```
 
@@ -41,7 +41,7 @@ same board. `backend/scripts/serve.sh` does that from `.env` (never `seed` again
 ## Lifecycle
 
 `unstaged` (written down) → `staged` (context added) → `committed` (an agent is on it) → `closed`.
-A staged task can be retransformed — rewritten, enriched, split, or completed with the next step
+A staged task can be retransformed: rewritten, enriched, split, or completed with the next step
 yielded. Closing and editing never need an agent. There is no erase.
 
 The agent is the owner's secretary, and there is one of it with one queue: commits line up, it
@@ -69,7 +69,7 @@ The mobile app is built (`mobile-app/`, SwiftUI; the call screen runs on the Ele
 
 `Dockerfile` at the root builds the backend into one image with the board page and pi as the agent
 command (committed tasks run on OpenRouter's gemini-3.5-flash-lite inside the container). Railway
-builds it as is: `railway init`, set the variables from `.env.example`, then `./deploy.sh` — a
+builds it as is: `railway init`, set the variables from `.env.example`, then `./deploy.sh`, a
 direct upload of this working tree (no git hook) that waits for the new build to answer. Set `UNDERCURRENT_API_KEY` there: with it, every request but the health check and the page
 needs `Authorization: Bearer <key>`, so only people with the key can reach the board.
 `MOBILE_APP.md` has the exact steps.
@@ -80,7 +80,7 @@ The board and the agent need no key. Every other integration is off without its 
 failures stay inside it: a Dial call that does not go through hands the task back with the reason,
 a Keewano post that fails is logged and the event stays in the local table, a chat-model summary
 that fails becomes a plain sentence. The agent runs in a scratch folder (`AGENT_DIR`), so nothing a
-project carries — hooks, settings, files — is in its way or at its mercy.
+project carries: hooks, settings, files, is in its way or at its mercy.
 
 ## Calls
 

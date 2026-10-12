@@ -5,7 +5,7 @@ The native iOS app (SwiftUI, iOS 17) for the board. It talks to the Go backend o
 `DESIGN.md`.
 
 Built on the same XcodeGen + Fastlane + match pipeline as `~/Developer/mobile-dev`: the
-`.xcodeproj` is generated from `project.yml` — never edit it directly.
+`.xcodeproj` is generated from `project.yml`: never edit it directly.
 
 ## Layout
 

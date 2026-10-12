@@ -74,7 +74,7 @@ func (s *Store) Migrate() error {
 	return nil
 }
 
-// statements splits SQL text on the semicolons that end statements — not the ones inside a
+// statements splits SQL text on the semicolons that end statements, not the ones inside a
 // quoted string or a `-- …` comment, both of which the demo set has.
 func statements(text string) []string {
 	var out []string

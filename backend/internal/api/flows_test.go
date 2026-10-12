@@ -168,7 +168,7 @@ func TestI3RetransformSplitsIntoChildren(t *testing.T) {
 	}
 }
 
-// I5 · live: add and commit by voice — the first commit call returns the read-back, the second lands.
+// I5 · live: add and commit by voice, the first commit call returns the read-back, the second lands.
 func TestI5LiveToolsReadBackThenLand(t *testing.T) {
 	srv := flows(t, fakeAgent(t, verdict("done", "done", "", "")), nil)
 	tool := func(name, body string) map[string]any {

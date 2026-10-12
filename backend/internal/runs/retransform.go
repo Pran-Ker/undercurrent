@@ -28,8 +28,8 @@ const retransformSystem = `You turn a person's instruction about one task on the
 Each op is one of:
   {"op": "rewrite", "text": "<the task's new words>"}
   {"op": "enrich", "context": "<text to append to the task's context>"}
-  {"op": "split", "children": [{"text": "...", "context": "..."}, ...]}      — the task closes, the children are staged
-  {"op": "complete", "note": "<what was done>", "next": {"text": "...", "context": "..."}}   — next is optional
+  {"op": "split", "children": [{"text": "...", "context": "..."}, ...]}, the task closes, the children are staged
+  {"op": "complete", "note": "<what was done>", "next": {"text": "...", "context": "..."}}, next is optional
 Only what the instruction says; never invent facts. Keep every text short and in the person's own words where possible.`
 
 // Retransform applies the user's instruction to a staged task through the chat model. The run is

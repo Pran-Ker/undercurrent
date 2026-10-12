@@ -49,7 +49,7 @@
 </style>
 <header>
   <h1>undercurrent</h1>
-  <input id="add" placeholder="write a task down — Enter adds it to unstaged">
+  <input id="add" placeholder="write a task down, Enter adds it to unstaged">
   <button id="call" title="talk to the agent">Call</button>
   <button id="refresh">Refresh</button>
 </header>
@@ -133,12 +133,12 @@ function renderDetail() {
     ${t.stage === "staged" ? `<label>retransform</label><textarea id="d-instr" placeholder="the first half is done, the rest is… · split this into… · add that…"></textarea><div class="row"><button class="btn" id="d-retransform">Retransform</button></div>` : ""}
     ${t.note ? `<label>notes</label><div class="steps">${esc(t.note)}</div>` : ""}
     ${run && run.status === "needs_you" ? `<div class="q"><b>The agent asks:</b> ${esc(run.question)}<textarea id="d-answer" placeholder="your answer"></textarea><div class="row"><button class="btn primary" id="d-answer-btn">Answer</button></div></div>` : ""}
-    ${taskRuns.length ? `<label>runs</label>` + taskRuns.map(r => `<div class="steps"><b>${r.kind} ${r.id} · ${r.status}</b>${r.result ? "\n" + esc(r.result) : ""}\n` + r.steps.map(s => `${s.at.slice(11, 16)} ${s.kind}${s.cmd ? " " + esc(s.cmd) : ""}${s.exit ? " exit " + s.exit : ""}${s.ms ? " " + s.ms + "ms" : ""}${s.note ? " — " + esc(s.note) : ""}${s.output ? "\n  " + esc(s.output.slice(0, 600)) : ""}`).join("\n") + `</div>`).join("") : ""}
+    ${taskRuns.length ? `<label>runs</label>` + taskRuns.map(r => `<div class="steps"><b>${r.kind} ${r.id} · ${r.status}</b>${r.result ? "\n" + esc(r.result) : ""}\n` + r.steps.map(s => `${s.at.slice(11, 16)} ${s.kind}${s.cmd ? " " + esc(s.cmd) : ""}${s.exit ? " exit " + s.exit : ""}${s.ms ? " " + s.ms + "ms" : ""}${s.note ? ", " + esc(s.note) : ""}${s.output ? "\n  " + esc(s.output.slice(0, 600)) : ""}`).join("\n") + `</div>`).join("") : ""}
   `;
   const on = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
   on("d-save", () => act(() => api(`/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ text: val("d-text"), context: val("d-ctx") }) }), "saved"));
   on("d-stage", () => { const c = val("d-ctx"); if (!c.trim()) return toast("context is what staging is"); act(() => api(`/tasks/${t.id}/stage`, { method: "POST", body: JSON.stringify({ context: c }) }), "staged"); });
-  on("d-commit", () => act(() => api(`/tasks/${t.id}/commit`, { method: "POST" }), "committed — the agent is on it"));
+  on("d-commit", () => act(() => api(`/tasks/${t.id}/commit`, { method: "POST" }), "committed, the agent is on it"));
   on("d-close", () => act(() => api(`/tasks/${t.id}/close`, { method: "POST" }), "closed"));
   on("d-retransform", () => { const i = val("d-instr"); if (!i.trim()) return; act(() => api(`/tasks/${t.id}/retransform`, { method: "POST", body: JSON.stringify({ instruction: i }) }).then(j => toast(j.say || "done")), null); });
   on("d-answer-btn", () => { const a = val("d-answer"); if (!a.trim()) return; act(() => api(`/runs/${run.id}/answer`, { method: "POST", body: JSON.stringify({ answer: a }) }), "answered"); });
@@ -161,7 +161,7 @@ for (const col of document.querySelectorAll(".col")) {
     const id = e.dataTransfer.getData("text/plain"), t = tasks.find(x => x.id === id), to = col.dataset.stage;
     if (!t || t.stage === to) return;
     selected = id;
-    if (to === "staged") { const c = prompt("Context — what done looks like, constraints, who to contact:", t.context || ""); if (c === null || !c.trim()) return; return act(() => api(`/tasks/${id}/stage`, { method: "POST", body: JSON.stringify({ context: c }) }), "staged"); }
+    if (to === "staged") { const c = prompt("Context, what done looks like, constraints, who to contact:", t.context || ""); if (c === null || !c.trim()) return; return act(() => api(`/tasks/${id}/stage`, { method: "POST", body: JSON.stringify({ context: c }) }), "staged"); }
     if (to === "committed") { if (t.stage !== "staged") return toast("stage it first"); return act(() => api(`/tasks/${id}/commit`, { method: "POST" }), "committed"); }
     if (to === "closed") return act(() => api(`/tasks/${id}/close`, { method: "POST" }), "closed");
     if (to === "unstaged") return toast("a task does not go back to unstaged; close it or edit it");
@@ -199,7 +199,7 @@ async function runTool(name, params, secret) {
     const r = await fetch(`/live/tools/${name}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Secret": secret, ...keyHeader() }, body: JSON.stringify({ ...params, conversation_id: conversationId }) });
     const j = await r.json();
     load();
-    const out = j.ok ? j.result : (j.needs_confirmation ? `NEEDS CONFIRMATION — read this back and wait for a yes: ${j.read_back}` : `ERROR: ${j.error}`);
+    const out = j.ok ? j.result : (j.needs_confirmation ? `NEEDS CONFIRMATION, read this back and wait for a yes: ${j.read_back}` : `ERROR: ${j.error}`);
     callStatus("connected", `${name} → ${out.slice(0, 160)}`);
     return out;
   } catch (e) { callStatus("connected", `${name} failed: ${e.message}`); return "ERROR: " + e.message; }
@@ -221,7 +221,7 @@ callBtn.onclick = async () => {
     callStatus("connecting", "starting the conversation");
     convo = await Conversation.startSession({
       signedUrl: signed_url, clientTools, dynamicVariables: { user_id: "owner", board: cfg.board },
-      onConnect: ({ conversationId: id }) => { conversationId = id; callBtn.textContent = "Hang up"; callStatus("connected", "talk — the agent knows the board; say where a task should go"); },
+      onConnect: ({ conversationId: id }) => { conversationId = id; callBtn.textContent = "Hang up"; callStatus("connected", "talk, the agent knows the board; say where a task should go"); },
       onMessage: ({ message, role, source }) => { transcript.push({ role: role || (source === "user" ? "user" : "agent"), message }); callStatus("connected"); },
       onDisconnect: async d => {
         callBtn.textContent = "Call"; convo = null;

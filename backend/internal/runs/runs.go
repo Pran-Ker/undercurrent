@@ -1,7 +1,7 @@
 // Package runs is the agent at work: the owner's secretary. There is one agent and one queue:
 // commits line up, the agent takes them in order, a run that asks parks its task and the next is
 // taken, an answer puts the task back in line. A run invokes an agent command (Claude Code by
-// default) once and reads its verdict — done, needs_you, open or failed — unless the task says call
+// default) once and reads its verdict, done, needs_you, open or failed, unless the task says call
 // and names a phone number, in which case the run is a call placed through Dial. A retransform asks
 // the chat model for the operations the user's words imply and applies them.
 package runs
@@ -24,13 +24,13 @@ import (
 type Runner struct {
 	S        *store.Store
 	AgentCmd []string      // AGENT_CMD: reads the prompt on stdin, prints its answer
-	Dir      string        // AGENT_DIR: where the agent runs — a scratch folder, so no project hooks, settings or files are in its way
+	Dir      string        // AGENT_DIR: where the agent runs, a scratch folder, so no project hooks, settings or files are in its way
 	Sync     bool          // tests: run in the request instead of a goroutine
 	Retries  int           // bounded retries on a failed invocation
 	Backoff  time.Duration // between retries
 	Timeout  time.Duration // one invocation
 	Recall   func(string) string
-	Chat     func(system, user string) (string, error) // the chat model, JSON out — for retransforms and call summaries
+	Chat     func(system, user string) (string, error) // the chat model, JSON out, for retransforms and call summaries
 	Dial     *dial.Client                              // DIAL_API_KEY: a committed task that names a phone number is placed as a call
 	queue    chan string                               // the commit queue: one agent takes runs in order
 	worker   sync.Once
@@ -143,7 +143,7 @@ func (r *Runner) execute(runID string) {
 	case err != nil:
 		r.fail(run, t, actor, "the agent could not run: "+err.Error())
 	case perr != nil:
-		run.Status, run.Question = "needs_you", "The agent ended without a verdict. It said: "+clip(out, 600)+" — what should happen to this task?"
+		run.Status, run.Question = "needs_you", "The agent ended without a verdict. It said: "+clip(out, 600)+", what should happen to this task?"
 		r.S.PutRun(run)
 		r.S.RecordRun(actor, "ask", run.ID, &t, &t, run.Question)
 	case v.Outcome == "needs_you":
@@ -179,7 +179,7 @@ func (r *Runner) done(run store.Run, t store.Task, actor string, v Verdict) {
 
 // call is the run for a task that names a phone number: Dial places the call with the task as the
 // voice agent's instruction; the transcript becomes the run's step and the next task, review notes.
-// A call that was not completed — busy, unanswered, failed — hands the task back.
+// A call that was not completed, busy, unanswered, failed, hands the task back.
 func (r *Runner) call(run store.Run, t store.Task, actor, to string) {
 	started := time.Now()
 	c, err := r.Dial.Place(to, callInstruction(t), run.ID)
@@ -220,7 +220,7 @@ func callInstruction(t store.Task) string {
 	if t.Note != "" {
 		b.WriteString("\nNotes so far: " + t.Note)
 	}
-	b.WriteString("\nOpen by saying who you are calling for and why. Get what the task needs — an answer, a booking, a confirmation — and repeat it back. Say only what the task gives you; if asked something it does not cover, say the principal will follow up. Be brief and warm, and end the call once the task is handled.")
+	b.WriteString("\nOpen by saying who you are calling for and why. Get what the task needs, an answer, a booking, a confirmation, and repeat it back. Say only what the task gives you; if asked something it does not cover, say the principal will follow up. Be brief and warm, and end the call once the task is handled.")
 	return b.String()
 }
 
@@ -324,8 +324,8 @@ func (r *Runner) once(prompt string) (string, error) {
 func (r *Runner) commitPrompt(t store.Task, run store.Run) string {
 	var b strings.Builder
 	b.WriteString(`You are the owner's secretary, working one task from their board. Tasks come in two kinds:
-- Things you can do from here — look something up, check a fact, research, draft, prepare: do it and put what you found in the note.
-- Things only the owner can do — go somewhere, meet someone, exercise, buy, sign, attend: do not attempt them. Ask one question: whether it is done ("Did you go to the gym?"). A yes closes the task (outcome done, the note says what they told you); a no or "not yet" keeps it open (outcome open, the note says what they said).
+- Things you can do from here: look something up, check a fact, research, draft, prepare: do it and put what you found in the note.
+- Things only the owner can do: go somewhere, meet someone, exercise, buy, sign, attend: do not attempt them. Ask one question: whether it is done ("Did you go to the gym?"). A yes closes the task (outcome done, the note says what they told you); a no or "not yet" keeps it open (outcome open, the note says what they said).
 
 `)
 	fmt.Fprintf(&b, "TASK %s: %s\n", t.ID, t.Text)

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Deploy the backend to the Railway dev project straight from this working tree — no git hook:
+# Deploy the backend to the Railway dev project straight from this working tree, no git hook:
 # `railway up` uploads the tree, Railway builds the Dockerfile, the service restarts with the
 # variables it already has. Run from the repo root (once: `railway link` to the project). Prints the
 # URL and waits until the new deployment, not the old one, answers /health.

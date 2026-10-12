@@ -58,7 +58,7 @@ the backend is local and open. `X-Actor` names who acted.
 | Method and path | Body | Returns | Notes |
 |---|---|---|---|
 | `POST /tasks/:id/commit` | | `run` (202) | staged → committed; the agent command runs (a goroutine; synchronous when `UNDERCURRENT_SYNC_RUNS=1`). Done: the task closes with the agent's note and an optional next step lands unstaged with `parent_id`. Needs you: the run waits with a question. Failed: the task returns to staged with the failure in its note |
-| `POST /tasks/:id/retransform` | `{instruction}` | `{run, say}` | the chat model turns the instruction into operations — rewrite, enrich, split, complete with a next step — applied as events by the run; 502 with the run when the model gives none |
+| `POST /tasks/:id/retransform` | `{instruction}` | `{run, say}` | the chat model turns the instruction into operations, rewrite, enrich, split, complete with a next step, applied as events by the run; 502 with the run when the model gives none |
 | `GET /runs?task=` | | `[run]` | newest first |
 | `GET /runs/:id` | | `run` | |
 | `POST /runs/:id/answer` | `{answer}` | `run` (202) | resumes a `needs_you` run; the agent is invoked again with its question and the answer |

@@ -212,7 +212,7 @@ struct ToolReply: Decodable, Equatable {
     // What the agent is told, per MOBILE_APP.md.
     var spoken: String {
         if ok { return result }
-        if needsConfirmation { return "NEEDS CONFIRMATION — read this back and wait for a yes: " + readBack }
+        if needsConfirmation { return "NEEDS CONFIRMATION, read this back and wait for a yes: " + readBack }
         return "ERROR: " + (error.isEmpty ? "the backend refused that" : error)
     }
 }

@@ -129,7 +129,7 @@ sequenceDiagram
   P->>B: POST /live/tools/move_task {ref, stage, conversation_id}  (X-Live-Secret from GET /live/config)
   B-->>P: {ok, result} · or {needs_confirmation, read_back}
   P->>E: sendToolResult(toolCallId, result)
-  P->>B: GET /tasks — refresh the cards now, not on the next focus
+  P->>B: GET /tasks, refresh the cards now, not on the next focus
   E-->>P: ended
   P->>B: POST /live/post-call {conversation_id, transcript}
 ```

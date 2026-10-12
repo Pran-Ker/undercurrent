@@ -20,7 +20,7 @@ final class LiveTests: XCTestCase {
         XCTAssertFalse(r.ok)
         XCTAssertTrue(r.needsConfirmation)
         XCTAssertEqual(r.readBack, "Commit “fix the bike”?")
-        XCTAssertEqual(r.spoken, "NEEDS CONFIRMATION — read this back and wait for a yes: Commit “fix the bike”?")
+        XCTAssertEqual(r.spoken, "NEEDS CONFIRMATION, read this back and wait for a yes: Commit “fix the bike”?")
     }
 
     func testSpokenError() throws {

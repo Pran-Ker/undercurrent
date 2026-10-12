@@ -52,7 +52,7 @@ sequenceDiagram
   P->>B: POST /live/tools/move_task  {ref, stage, conversation_id}  (key + X-Live-Secret)
   B-->>P: {ok, result} · or {needs_confirmation, read_back} · or {error}
   P-->>E: the result string, spoken by the agent
-  P->>B: GET /tasks — refresh the cards right after every tool call
+  P->>B: GET /tasks, refresh the cards right after every tool call
   E-->>P: onDisconnect
   P->>B: POST /live/post-call {type: "post_call_transcription", data: {conversation_id, transcript, analysis: {}}}  (key)
 ```
@@ -66,7 +66,7 @@ What the app does, concretely:
    where `clientTools` maps **each name in `tools`** to a function that POSTs its parameters plus
    `conversation_id` to `/live/tools/<name>` with `X-Live-Secret: <secret>` and the key, and
    returns a string: `result` when `ok`, else
-   `"NEEDS CONFIRMATION — read this back and wait for a yes: " + read_back`, else `"ERROR: " + error`.
+   `"NEEDS CONFIRMATION, read this back and wait for a yes: " + read_back`, else `"ERROR: " + error`.
    Refresh the cards after every tool call: that is how "move build the bookshelf to done" shows
    up on screen while the agent is still talking.
 4. Keep the transcript from `onMessage` (`{message, role}`; `role` is `user` or `agent`). On
@@ -84,7 +84,7 @@ exactly this flow in a hundred lines; copy its `runTool` and `startSession` call
 
 ## Screens
 
-**Home** — three stacked cards, each a list:
+**Home**: three stacked cards, each a list:
 
 | Card | Shows | Tap a row |
 |---|---|---|
@@ -95,22 +95,22 @@ exactly this flow in a hundred lines; copy its `runTool` and `startSession` call
 Below them a **Closed** sheet (pull up), and a floating **Add** button (one text field, lands
 unstaged). A **Call** button at the top opens the call screen.
 
-**Task** — text, context (editable), tags, notes (what runs wrote), the lineage (parent and
-children), and the buttons for its stage. Editing text or context is a direct edit — one request,
+**Task**: text, context (editable), tags, notes (what runs wrote), the lineage (parent and
+children), and the buttons for its stage. Editing text or context is a direct edit, one request,
 no agent.
 
-**Retransform** — a text box: "the first half is done, the rest is X", "split this into three",
+**Retransform**: a text box: "the first half is done, the rest is X", "split this into three",
 "add that the landlord prefers mornings". Sends `POST /tasks/:id/retransform`; the result shows
 as the board changing (a closed task and a new staged one, three children, richer context).
 
-**Run** — the question if there is one, the answer box, the steps the agent took, the note it
+**Run**: the question if there is one, the answer box, the steps the agent took, the note it
 wrote, the next task it yielded.
 
-**Call** — full screen: status (connecting · listening · speaking), a transcript strip with the
+**Call**: full screen: status (connecting · listening · speaking), a transcript strip with the
 last lines, the agent's read-back as text with **Yes** / **No** buttons (also answerable by
 voice), and hang up. The flow is the one in "The live conversation, end to end" above.
 
-**Time travel** — a sidebar, not a tab: it is rare. The last 20 actions from
+**Time travel**: a sidebar, not a tab: it is rare. The last 20 actions from
 `GET /events?limit=20` as a list; tapping one renders `GET /state?at=<that event's at>`, the board
 as it was right after it, read-only, with a "back to now" button. Restore (`POST /restore?at=`) can
 stay out of the app.
@@ -126,7 +126,7 @@ stay out of the app.
 6. Direct edit and close without any agent.
 7. Call: "put the dentist on the board and commit it" → the agent reads it back → Yes → done.
    Nothing above *add* and *stage* happens on a call without the read-back.
-8. Time travel: the sidebar above — the last 20 actions, each a moment the board can be shown at.
+8. Time travel: the sidebar above, the last 20 actions, each a moment the board can be shown at.
 
 ## Confirmation rule
 
@@ -137,7 +137,7 @@ question need no confirmation.
 
 ## Stack
 
-Expo (dev build, not Expo Go — the ElevenLabs SDK needs native modules), `@elevenlabs/react-native`
+Expo (dev build, not Expo Go, the ElevenLabs SDK needs native modules), `@elevenlabs/react-native`
 with the LiveKit packages from their Expo guide, `fetch` against `BACKEND_URL`. No local database:
 the board is fetched on focus and after every action; the backend is the truth.
 

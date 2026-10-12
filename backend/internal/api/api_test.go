@@ -66,7 +66,7 @@ func TestTheDemoSetTakesItsStages(t *testing.T) {
 	}
 }
 
-// I4 · direct add, stage, edit, close — no agent, four events by `user`.
+// I4 · direct add, stage, edit, close, no agent, four events by `user`.
 func TestDirectActionsLeaveEvents(t *testing.T) {
 	srv := scratch(t)
 	var task store.Task

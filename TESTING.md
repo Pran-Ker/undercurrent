@@ -9,7 +9,7 @@ the database afterwards. Each integration test has one diagram of the flow it ho
 
 Run: `cd backend && go test ./...`
 
-## I1 · commit runs the agent and yields the next step — `TestI1CommitRunsTheAgentAndYieldsTheNextStep`
+## I1 · commit runs the agent and yields the next step, `TestI1CommitRunsTheAgentAndYieldsTheNextStep`
 
 ```mermaid
 sequenceDiagram
@@ -28,7 +28,7 @@ sequenceDiagram
   A-->>U: run done with one agent step, the next step on the board
 ```
 
-## I2 · retransform completes and yields the next — `TestI2RetransformCompletesAndYieldsTheNext`
+## I2 · retransform completes and yields the next, `TestI2RetransformCompletesAndYieldsTheNext`
 
 ```mermaid
 sequenceDiagram
@@ -44,7 +44,7 @@ sequenceDiagram
   A-->>U: run done, say
 ```
 
-## I3 · retransform splits into children — `TestI3RetransformSplitsIntoChildren`
+## I3 · retransform splits into children: `TestI3RetransformSplitsIntoChildren`
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +60,7 @@ sequenceDiagram
   A-->>U: the three children
 ```
 
-## I4 · direct actions leave events — `TestDirectActionsLeaveEvents`
+## I4 · direct actions leave events: `TestDirectActionsLeaveEvents`
 
 ```mermaid
 sequenceDiagram
@@ -81,7 +81,7 @@ sequenceDiagram
   A-->>U: add, stage, edit, close, all by user
 ```
 
-## I5 · live tools read back, then land — `TestI5LiveToolsReadBackThenLand`
+## I5 · live tools read back, then land, `TestI5LiveToolsReadBackThenLand`
 
 ```mermaid
 sequenceDiagram
@@ -103,7 +103,7 @@ sequenceDiagram
   A-->>V: 403
 ```
 
-## I6 · the agent asks, the owner answers, the run resumes — `TestI6AnAgentQuestionIsAnsweredAndTheRunResumes`
+## I6 · the agent asks, the owner answers, the run resumes, `TestI6AnAgentQuestionIsAnsweredAndTheRunResumes`
 
 ```mermaid
 sequenceDiagram
@@ -122,7 +122,7 @@ sequenceDiagram
   A->>D: task closed, run done with three steps
 ```
 
-## I7 · time travel and restore — `TestI7StateAtAMoment`
+## I7 · time travel and restore: `TestI7StateAtAMoment`
 
 ```mermaid
 sequenceDiagram
@@ -145,7 +145,7 @@ sequenceDiagram
   A-->>U: restored 1, closed 1
 ```
 
-## I8 · who did what — `TestI8WhoDidWhat`
+## I8 · who did what: `TestI8WhoDidWhat`
 
 ```mermaid
 sequenceDiagram
@@ -160,7 +160,7 @@ sequenceDiagram
   A-->>U: user add 1 stage 1 commit 1, agent close 1, live:conv9 add 1
 ```
 
-## I9 · bounded retries, then hand back — `TestI9BoundedRetriesThenHandBack`
+## I9 · bounded retries, then hand back, `TestI9BoundedRetriesThenHandBack`
 
 ```mermaid
 sequenceDiagram
@@ -181,7 +181,7 @@ sequenceDiagram
   A->>D: run failed, task back to staged with run failed in its note, event hand_back
 ```
 
-## I10 · the post-call webhook feeds recall — `TestI10PostCallWebhookFeedsRecall`
+## I10 · the post-call webhook feeds recall, `TestI10PostCallWebhookFeedsRecall`
 
 ```mermaid
 sequenceDiagram
@@ -197,7 +197,7 @@ sequenceDiagram
   A-->>V: the session summary, cited by its conversation id
 ```
 
-## I11 · a committed call task dials and leaves review notes — `TestI11CommittedCallTaskDialsAndLeavesReviewNotes`
+## I11 · a committed call task dials and leaves review notes, `TestI11CommittedCallTaskDialsAndLeavesReviewNotes`
 
 The task says call and names a phone number, so the run is a call; a number without a call verb goes
 to the agent as usual. Dial is a scripted counterpart here (a fake
@@ -227,7 +227,7 @@ sequenceDiagram
   A->>A: the agent command, as for any task
 ```
 
-## I12 · one agent works the queue; a question parks the task — `TestI12OneAgentWorksTheQueueAndAQuestionParksTheTask`
+## I12 · one agent works the queue; a question parks the task, `TestI12OneAgentWorksTheQueueAndAQuestionParksTheTask`
 
 The only test on the real queue (the others run the agent in the request). The scripted agent's
 lines are consumed in order, which is how the test knows the gym was taken first.
@@ -247,7 +247,7 @@ sequenceDiagram
   Q->>G: run 2 · weather
   G-->>Q: done "sunny, 61°F"
   Q->>A: weather closed with the note
-  V->>A: GET /live/config — the board text ends with the waiting question
+  V->>A: GET /live/config, the board text ends with the waiting question
   U->>A: POST /runs/1/answer "yes, this morning"
   A->>Q: run 1 queued again
   Q->>G: run 1 with the answer
@@ -257,6 +257,6 @@ sequenceDiagram
 
 ## Smaller tests
 
-- The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed — `TestTheDemoSetTakesItsStages`
+- The demo set takes its stages from the migration: 16 unstaged, 22 staged, 4 closed, `TestTheDemoSetTakesItsStages`
 - Planned: `state(at)` on an empty log; the Keewano payload builder emits only registered ids
-  (needs no key — `Payload` is exported for it); legal transitions only.
+  (needs no key, `Payload` is exported for it); legal transitions only.

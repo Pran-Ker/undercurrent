@@ -4,8 +4,8 @@ Instructions for any coding agent in this repository.
 
 ## What this is
 
-A voice-first personal agent for the things you have to do. Tasks sit on a board — `unstaged`,
-`staged`, `committed`, `closed` — and every move is an event. `README.md` is the overview,
+A voice-first personal agent for the things you have to do. Tasks sit on a board, `unstaged`,
+`staged`, `committed`, `closed`, and every move is an event. `README.md` is the overview,
 `backend/API.md` the contract, `MOBILE_APP.md` the app, `TESTING.md` the tests, `SUGGESTIONS.md`
 the research. Read `README.md` and `backend/API.md` before changing anything.
 
@@ -31,7 +31,7 @@ the research. Read `README.md` and `backend/API.md` before changing anything.
 cp .env.example .env
 cd backend
 go run ./cmd/undercurrent seed    # migrate + the 42-task demo set into a local file
-go run ./cmd/undercurrent serve   # http://127.0.0.1:8787 — the board at /, the API at /tasks
+go run ./cmd/undercurrent serve   # http://127.0.0.1:8787: the board at /, the API at /tasks
 go test ./...
 ```
 
@@ -45,5 +45,5 @@ Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in `.env` to work on the shared 
 
 ## Before you finish
 
-`cd backend && gofmt -l . && go vet ./... && go test ./...` — all three clean. Update
+`cd backend && gofmt -l . && go vet ./... && go test ./...`, all three clean. Update
 `backend/API.md` when an endpoint changes, and `TESTING.md` when a test is added.
